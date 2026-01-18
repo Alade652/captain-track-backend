@@ -35,44 +35,38 @@ GoogleCredential credential;
 if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 {
     // Production/Render: Load from JSON string in environment variable
-    try 
-    {
-        credential = GoogleCredential.FromJson(firebaseServiceAccountJson);
-    }
-    catch (FormatException)
-    {
-        // Fallback: Try to fix common copy-paste escaping issues in the private key
         try 
         {
             var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
             var privateKey = jobject["private_key"]?.ToString();
-            
-            if (!string.IsNullOrEmpty(privateKey))
+            var clientEmail = jobject["client_email"]?.ToString();
+            var tokenUri = jobject["token_uri"]?.ToString() ?? "https://oauth2.googleapis.com/token";
+
+            if (!string.IsNullOrEmpty(privateKey) && !string.IsNullOrEmpty(clientEmail))
             {
-                // Proven "Senior Developer" Fix:
-                // Just handle the newline unescaping. Don't touch anything else.
-                // If it fails, log the HEX representation to see what invisible chars are there.
-                
+                // Fix: Manually handle the newline escaping in the private key
                 var fixedKey = privateKey.Contains("\\n") ? privateKey.Replace("\\n", "\n") : privateKey;
 
-                // Log the first 50 chars as HEX to catch invisible garbage (e.g. BOM, control chars)
-                var debugSample = fixedKey.Substring(0, Math.Min(50, fixedKey.Length));
-                var hexDump = BitConverter.ToString(System.Text.Encoding.UTF8.GetBytes(debugSample));
-                Console.WriteLine($"[AuthDebug] Key Start (Hex): {hexDump}");
+                // Manual Construction: Bypasses the problematic internal JSON parser
+                var initializer = new ServiceAccountCredential.Initializer(clientEmail)
+                {
+                    Key = fixedKey,
+                }.FromPrivateKey(fixedKey);
 
-                jobject["private_key"] = fixedKey;
-                credential = GoogleCredential.FromJson(jobject.ToString());
+                var serviceAccountCredential = new ServiceAccountCredential(initializer);
+                credential = GoogleCredential.FromCredential(serviceAccountCredential);
+                
+                Console.WriteLine("[Auth] Successfully constructed credential manually.");
             }
             else
             {
-                throw new InvalidOperationException("Private key is missing in FIREBASE_SERVICE_ACCOUNT_JSON.");
+                throw new InvalidOperationException("Required fields (private_key, client_email) are missing in FIREBASE_SERVICE_ACCOUNT_JSON.");
             }
         }
         catch (Exception)
         {
             // If fixing fails, rethrow original to show root cause
             throw; 
-        }
     }
 }
 else
