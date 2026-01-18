@@ -45,7 +45,7 @@
     <Folder Include="wwwroot\Files\" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="Exists('.env')">
     <None Include=".env">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
