@@ -28,8 +28,9 @@ builder.Configuration
     .AddEnvironmentVariables()
     .AddUserSecrets<Program>(optional: true);
 
-// Firebase initialization - Simple file-based approach
-// Priority: 1) File path from config/env, 2) Default file name, 3) Environment variable JSON
+// Firebase initialization - Optional (commented out to disable)
+// Uncomment the code below to enable Firebase
+/*
 GoogleCredential credential;
 
 // Try file first (simplest approach)
@@ -74,25 +75,32 @@ else
     }
     else
     {
-        throw new FileNotFoundException(
-            $"Firebase service account key not found. " +
-            $"Checked paths: {string.Join(", ", possiblePaths)}. " +
-            $"Please add 'serviceAccountKey.json' to the project root or set FIREBASE_SERVICE_ACCOUNT_JSON environment variable.");
+        Console.WriteLine("[WARNING] Firebase credentials not found. Firebase features will be disabled.");
+        // Don't throw - make it optional
     }
 }
 
-FirebaseApp.Create(new AppOptions
+if (credential != null)
 {
-    Credential = credential
-});
+    FirebaseApp.Create(new AppOptions
+    {
+        Credential = credential
+    });
 
-var firebaseDatabaseUrl = builder.Configuration["Firebase:DatabaseUrl"] 
-    ?? Environment.GetEnvironmentVariable("FIREBASE_DATABASE_URL")
-    ?? throw new InvalidOperationException(
-        "Firebase Database URL is not configured. " +
-        "Please set Firebase:DatabaseUrl in appsettings.json or FIREBASE_DATABASE_URL environment variable.");
-
-builder.Services.AddSingleton(_ => new FirebaseClient(firebaseDatabaseUrl));
+    var firebaseDatabaseUrl = builder.Configuration["Firebase:DatabaseUrl"] 
+        ?? Environment.GetEnvironmentVariable("FIREBASE_DATABASE_URL");
+    
+    if (!string.IsNullOrEmpty(firebaseDatabaseUrl))
+    {
+        builder.Services.AddSingleton(_ => new FirebaseClient(firebaseDatabaseUrl));
+        Console.WriteLine("[Auth] Firebase initialized successfully.");
+    }
+    else
+    {
+        Console.WriteLine("[WARNING] Firebase Database URL not configured. Firebase client not initialized.");
+    }
+}
+*/
 
 
 
