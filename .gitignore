@@ -408,5 +408,4 @@ obj/
 Collapse
 CaptainTrackBackend.Host/.env
 # Firebase / Google service accounts
-serviceAccountKey.json
 *.firebase.json

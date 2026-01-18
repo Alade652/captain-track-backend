@@ -28,107 +28,56 @@ builder.Configuration
     .AddEnvironmentVariables()
     .AddUserSecrets<Program>(optional: true);
 
-// Firebase initialization with environment variable support
-// Production approach: Parse JSON, fix private_key newlines, use FromJson directly
-var firebaseServiceAccountJson = Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON");
+// Firebase initialization - Simple file-based approach
+// Priority: 1) File path from config/env, 2) Default file name, 3) Environment variable JSON
 GoogleCredential credential;
 
-if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
+// Try file first (simplest approach)
+var firebaseServiceAccountPath = builder.Configuration["Firebase:ServiceAccountKeyPath"] 
+    ?? Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+    ?? "serviceAccountKey.json";
+
+// Check multiple possible locations
+var possiblePaths = new[]
 {
-    try 
+    firebaseServiceAccountPath,
+    Path.Combine(Directory.GetCurrentDirectory(), firebaseServiceAccountPath),
+    Path.Combine(AppContext.BaseDirectory, firebaseServiceAccountPath),
+    "serviceAccountKey.json",
+    Path.Combine(Directory.GetCurrentDirectory(), "serviceAccountKey.json")
+};
+
+string? foundPath = null;
+foreach (var path in possiblePaths)
+{
+    if (File.Exists(path))
     {
-        // Parse JSON to access and fix private_key
-        var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
-        
-        // Validate required fields
-        if (jobject["private_key"] == null || jobject["client_email"] == null)
-        {
-            throw new InvalidOperationException(
-                "FIREBASE_SERVICE_ACCOUNT_JSON must contain 'private_key' and 'client_email' fields.");
-        }
-        
-        // Fix private_key: When JSON is stored as env var, \n can become \\n (double-escaped)
-        // After JSON parsing, \\n becomes literal \n (backslash+n), not actual newline
-        // We need to convert literal \n to actual newlines, then serialize (which converts back to \n in JSON)
-        
-        var privateKeyToken = jobject["private_key"];
-        if (privateKeyToken != null && privateKeyToken.Type == Newtonsoft.Json.Linq.JTokenType.String)
-        {
-            var privateKey = privateKeyToken.ToString();
-            
-            // Check if private_key contains literal \n (backslash + n) instead of actual newlines
-            // This happens when JSON had \\n (double-escaped)
-            if (privateKey.Contains("\\n") && !privateKey.Contains("\n"))
-            {
-                // Convert literal \n to actual newlines
-                privateKey = privateKey.Replace("\\n", "\n")
-                                      .Replace("\\r\\n", "\n")
-                                      .Replace("\\r", "\n");
-            }
-            
-            // Validate PEM format
-            if (!privateKey.TrimStart().StartsWith("-----BEGIN"))
-            {
-                throw new InvalidOperationException(
-                    "Invalid private key format. Must be PEM format starting with '-----BEGIN PRIVATE KEY-----'");
-            }
-            
-            // Update with fixed private key (has actual newlines)
-            jobject["private_key"] = privateKey;
-        }
-        
-        // Serialize back to JSON - JsonConvert will escape newlines as \n (correct for JSON)
-        var fixedJson = Newtonsoft.Json.JsonConvert.SerializeObject(jobject);
-        
-        // Use GoogleCredential.FromJson directly (production standard approach)
-        credential = GoogleCredential.FromJson(fixedJson);
-        
-        Console.WriteLine("[Auth] Successfully loaded Firebase credentials from environment variable.");
+        foundPath = path;
+        break;
     }
-    catch (Newtonsoft.Json.JsonException jsonEx)
-    {
-        throw new InvalidOperationException(
-            $"Invalid JSON in FIREBASE_SERVICE_ACCOUNT_JSON: {jsonEx.Message}", jsonEx);
-    }
-    catch (Exception ex)
-    {
-        throw new InvalidOperationException(
-            $"Failed to initialize Firebase credentials: {ex.Message}. " +
-            $"Ensure JSON is valid and private_key is properly formatted PEM key.", ex);
-    }
+}
+
+if (!string.IsNullOrEmpty(foundPath))
+{
+    // Load from file (simplest and most reliable)
+    credential = GoogleCredential.FromFile(foundPath);
+    Console.WriteLine($"[Auth] Successfully loaded Firebase credentials from file: {foundPath}");
 }
 else
 {
-    // Development/Fallback: Load from file
-    var firebaseServiceAccountPath = builder.Configuration["Firebase:ServiceAccountKeyPath"] 
-        ?? Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
-        ?? "serviceAccountKey.json";
-
-    // Only check for file if we don't have the JSON env var
-    // Conditional file loading to prevent crashing if file is missing in prod (when json env var should have been used)
-    bool fileExists = File.Exists(firebaseServiceAccountPath);
-    
-    if (!fileExists)
+    // Fallback to environment variable if file not found
+    var firebaseServiceAccountJson = Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON");
+    if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
     {
-         // If we are here, it means NO Json Env Var AND NO File.
-         // We must throw or log, but let's check if we can proceed.
-         // Given the user's previous error, we should be explicit.
-         Console.WriteLine($"WARNING: Firebase credentials file not found at {firebaseServiceAccountPath} and FIREBASE_SERVICE_ACCOUNT_JSON is empty.");
-    }
-
-    if (fileExists)
-    {
-        credential = GoogleCredential.FromFile(firebaseServiceAccountPath);
+        credential = GoogleCredential.FromJson(firebaseServiceAccountJson);
+        Console.WriteLine("[Auth] Successfully loaded Firebase credentials from environment variable.");
     }
     else
     {
-         // Fallback to default application credentials if everything else fails, 
-         // but strictly speaking for this app it seems required.
-         // We'll let it try creating with path, which will throw meaningful FileNotFound if we didn't handle it above.
-         // Reverting to strict check as per previous logic to ensure fail-fast.
-         throw new FileNotFoundException(
-            $"Firebase service account key not found at: {firebaseServiceAccountPath}. " +
-            $"For production, set FIREBASE_SERVICE_ACCOUNT_JSON environment variable with the content of the file.");
+        throw new FileNotFoundException(
+            $"Firebase service account key not found. " +
+            $"Checked paths: {string.Join(", ", possiblePaths)}. " +
+            $"Please add 'serviceAccountKey.json' to the project root or set FIREBASE_SERVICE_ACCOUNT_JSON environment variable.");
     }
 }
 
