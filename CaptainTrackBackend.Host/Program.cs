@@ -44,19 +44,24 @@ if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 
             if (!string.IsNullOrEmpty(privateKey) && !string.IsNullOrEmpty(clientEmail))
             {
-                // Fix: Manually handle the newline escaping in the private key
+                // Fix: Manually unescape the newlines to ensure a real RSA PEM string
                 var fixedKey = privateKey.Contains("\\n") ? privateKey.Replace("\\n", "\n") : privateKey;
 
-                // Manual Construction: Bypasses the problematic internal JSON parser
-                var initializer = new ServiceAccountCredential.Initializer(clientEmail)
+                // Senior approach: Use JsonCredentialParameters to bypass string re-serialization issues
+                var parameters = new Google.Apis.Auth.OAuth2.JsonCredentialParameters
                 {
-                    Key = fixedKey,
-                }.FromPrivateKey(fixedKey);
+                    Type = "service_account",
+                    PrivateKey = fixedKey,
+                    ClientEmail = clientEmail,
+                    ProjectId = jobject["project_id"]?.ToString()
+                };
 
-                var serviceAccountCredential = new ServiceAccountCredential(initializer);
-                credential = GoogleCredential.FromCredential(serviceAccountCredential);
+                // Use the internal factory method which is robust across library versions
+                #pragma warning disable CS0618
+                credential = GoogleCredential.FromJsonParameters(parameters);
+                #pragma warning restore CS0618
                 
-                Console.WriteLine("[Auth] Successfully constructed credential manually.");
+                Console.WriteLine("[Auth] Successfully loaded credentials using parameter injection.");
             }
             else
             {
