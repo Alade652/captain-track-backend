@@ -35,7 +35,40 @@ GoogleCredential credential;
 if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 {
     // Production/Render: Load from JSON string in environment variable
-    credential = GoogleCredential.FromJson(firebaseServiceAccountJson);
+    try 
+    {
+        credential = GoogleCredential.FromJson(firebaseServiceAccountJson);
+    }
+    catch (FormatException)
+    {
+        // Fallback: Try to fix common copy-paste escaping issues in the private key
+        try 
+        {
+            var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
+            var privateKey = jobject["private_key"]?.ToString();
+            
+            if (!string.IsNullOrEmpty(privateKey))
+            {
+                // Fix: Replace literal "\n" string with actual newline character, 
+                // and handle potential double-escaping which causes PEM parsing failure
+                var fixedKey = privateKey.Contains("\\n") 
+                    ? privateKey.Replace("\\n", "\n") 
+                    : privateKey;
+                    
+                jobject["private_key"] = fixedKey;
+                credential = GoogleCredential.FromJson(jobject.ToString());
+            }
+            else
+            {
+                throw;
+            }
+        }
+        catch (Exception)
+        {
+            // If fixing fails, rethrow original to show root cause
+            throw; 
+        }
+    }
 }
 else
 {
@@ -44,14 +77,32 @@ else
         ?? Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
         ?? "serviceAccountKey.json";
 
-    if (!File.Exists(firebaseServiceAccountPath))
+    // Only check for file if we don't have the JSON env var
+    // Conditional file loading to prevent crashing if file is missing in prod (when json env var should have been used)
+    bool fileExists = File.Exists(firebaseServiceAccountPath);
+    
+    if (!fileExists)
     {
-        throw new FileNotFoundException(
+         // If we are here, it means NO Json Env Var AND NO File.
+         // We must throw or log, but let's check if we can proceed.
+         // Given the user's previous error, we should be explicit.
+         Console.WriteLine($"WARNING: Firebase credentials file not found at {firebaseServiceAccountPath} and FIREBASE_SERVICE_ACCOUNT_JSON is empty.");
+    }
+
+    if (fileExists)
+    {
+        credential = GoogleCredential.FromFile(firebaseServiceAccountPath);
+    }
+    else
+    {
+         // Fallback to default application credentials if everything else fails, 
+         // but strictly speaking for this app it seems required.
+         // We'll let it try creating with path, which will throw meaningful FileNotFound if we didn't handle it above.
+         // Reverting to strict check as per previous logic to ensure fail-fast.
+         throw new FileNotFoundException(
             $"Firebase service account key not found at: {firebaseServiceAccountPath}. " +
             $"For production, set FIREBASE_SERVICE_ACCOUNT_JSON environment variable with the content of the file.");
     }
-
-    credential = GoogleCredential.FromFile(firebaseServiceAccountPath);
 }
 
 FirebaseApp.Create(new AppOptions
