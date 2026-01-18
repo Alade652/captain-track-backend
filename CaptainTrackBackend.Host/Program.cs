@@ -30,8 +30,9 @@ builder.Configuration
 
 // Firebase initialization - Optional (commented out to disable)
 // Uncomment the code below to enable Firebase
+// Note: For production, use FIREBASE_SERVICE_ACCOUNT_JSON environment variable, never commit credentials to git
 /*
-GoogleCredential credential;
+GoogleCredential? credential = null;
 
 // Try file first (simplest approach)
 var firebaseServiceAccountPath = builder.Configuration["Firebase:ServiceAccountKeyPath"] 

@@ -16,9 +16,13 @@ namespace CaptainTrackBackend.Persistence.Map
     {
         private readonly FirebaseClient _firebaseClient;
         private readonly IUnitofWork _unitofWork;
-        public TrackingHub(FirebaseClient firebaseClient, IUnitofWork unitofWork)
+        
+        // Constructor: FirebaseClient parameter is optional - creates its own instance if not provided
+        public TrackingHub(IUnitofWork unitofWork, FirebaseClient? firebaseClient = null)
         {
-            _firebaseClient = new FirebaseClient("https://locationtracking-df77d-default-rtdb.firebaseio.com/");
+            // Use provided FirebaseClient or create new instance with hardcoded URL
+            // Note: In production, this URL should come from configuration
+            _firebaseClient = firebaseClient ?? new FirebaseClient("https://locationtracking-df77d-default-rtdb.firebaseio.com/");
             _unitofWork = unitofWork;
         }
 
