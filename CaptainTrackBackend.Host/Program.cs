@@ -29,20 +29,34 @@ builder.Configuration
     .AddUserSecrets<Program>(optional: true);
 
 // Firebase initialization with environment variable support
-var firebaseServiceAccountPath = builder.Configuration["Firebase:ServiceAccountKeyPath"] 
-    ?? Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
-    ?? "serviceAccountKey.json";
+var firebaseServiceAccountJson = Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON");
+GoogleCredential credential;
 
-if (!File.Exists(firebaseServiceAccountPath))
+if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 {
-    throw new FileNotFoundException(
-        $"Firebase service account key not found at: {firebaseServiceAccountPath}. " +
-        $"Please set Firebase:ServiceAccountKeyPath in appsettings.json or FIREBASE_SERVICE_ACCOUNT_KEY_PATH environment variable.");
+    // Production/Render: Load from JSON string in environment variable
+    credential = GoogleCredential.FromJson(firebaseServiceAccountJson);
+}
+else
+{
+    // Development/Fallback: Load from file
+    var firebaseServiceAccountPath = builder.Configuration["Firebase:ServiceAccountKeyPath"] 
+        ?? Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+        ?? "serviceAccountKey.json";
+
+    if (!File.Exists(firebaseServiceAccountPath))
+    {
+        throw new FileNotFoundException(
+            $"Firebase service account key not found at: {firebaseServiceAccountPath}. " +
+            $"For production, set FIREBASE_SERVICE_ACCOUNT_JSON environment variable with the content of the file.");
+    }
+
+    credential = GoogleCredential.FromFile(firebaseServiceAccountPath);
 }
 
 FirebaseApp.Create(new AppOptions
 {
-    Credential = GoogleCredential.FromFile(firebaseServiceAccountPath)
+    Credential = credential
 });
 
 var firebaseDatabaseUrl = builder.Configuration["Firebase:DatabaseUrl"] 
