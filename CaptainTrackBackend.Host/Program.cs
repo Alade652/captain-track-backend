@@ -29,73 +29,61 @@ builder.Configuration
     .AddUserSecrets<Program>(optional: true);
 
 // Firebase initialization with environment variable support
+// Production approach: Parse JSON, fix private_key newlines, use FromJson directly
 var firebaseServiceAccountJson = Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON");
 GoogleCredential credential;
 
 if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 {
-    // Production/Render: Load from JSON string in environment variable
-    // This is the proven production approach: fix JSON string directly, write to temp file, use FromFile
     try 
     {
-        // Validate JSON is parseable
+        // Parse JSON to access and fix private_key
         var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
+        
+        // Validate required fields
         if (jobject["private_key"] == null || jobject["client_email"] == null)
         {
             throw new InvalidOperationException(
                 "FIREBASE_SERVICE_ACCOUNT_JSON must contain 'private_key' and 'client_email' fields.");
         }
         
-        // Fix escaped newlines in private_key field
-        // When JSON is stored as env var, newlines can be double-escaped (\\n) or single-escaped (\n)
-        // GoogleCredential.FromJson expects single-escaped \n in JSON string
-        // Strategy: Find private_key value and ensure it has \n (not \\n)
-        string fixedJson = firebaseServiceAccountJson;
+        // Fix private_key: When JSON is stored as env var, \n can become \\n (double-escaped)
+        // After JSON parsing, \\n becomes literal \n (backslash+n), not actual newline
+        // We need to convert literal \n to actual newlines, then serialize (which converts back to \n in JSON)
         
-        // Use regex to find private_key field value (handles multiline keys)
-        var privateKeyPattern = new System.Text.RegularExpressions.Regex(
-            @"""private_key""\s*:\s*""([^""]*(?:\\.[^""]*)*)""",
-            System.Text.RegularExpressions.RegexOptions.Singleline);
-        
-        fixedJson = privateKeyPattern.Replace(firebaseServiceAccountJson, match =>
+        var privateKeyToken = jobject["private_key"];
+        if (privateKeyToken != null && privateKeyToken.Type == Newtonsoft.Json.Linq.JTokenType.String)
         {
-            var keyValue = match.Groups[1].Value;
+            var privateKey = privateKeyToken.ToString();
             
-            // Fix double-escaped newlines: \\n -> \n (for JSON, we want \n not \\n)
-            // Also handle other escape scenarios
-            keyValue = keyValue.Replace("\\\\n", "\\n")    // Double-escaped -> single-escaped
-                              .Replace("\\\\r\\\\n", "\\n") // Double-escaped CRLF
-                              .Replace("\\\\r", "\\n")       // Double-escaped CR
-                              .Replace("\\\\\\\\", "\\\\"); // Double-escaped backslash -> single
+            // Check if private_key contains literal \n (backslash + n) instead of actual newlines
+            // This happens when JSON had \\n (double-escaped)
+            if (privateKey.Contains("\\n") && !privateKey.Contains("\n"))
+            {
+                // Convert literal \n to actual newlines
+                privateKey = privateKey.Replace("\\n", "\n")
+                                      .Replace("\\r\\n", "\n")
+                                      .Replace("\\r", "\n");
+            }
             
-            // Validate the key will parse correctly by checking it starts with BEGIN when unescaped
-            var unescapedForValidation = keyValue.Replace("\\n", "\n").Replace("\\r", "\n");
-            if (!unescapedForValidation.TrimStart().StartsWith("-----BEGIN"))
+            // Validate PEM format
+            if (!privateKey.TrimStart().StartsWith("-----BEGIN"))
             {
                 throw new InvalidOperationException(
-                    "Invalid private key format in FIREBASE_SERVICE_ACCOUNT_JSON. " +
-                    "Private key must be PEM format starting with '-----BEGIN PRIVATE KEY-----'");
+                    "Invalid private key format. Must be PEM format starting with '-----BEGIN PRIVATE KEY-----'");
             }
             
-            return $@"""private_key"":""{keyValue}""";
-        });
+            // Update with fixed private key (has actual newlines)
+            jobject["private_key"] = privateKey;
+        }
         
-        // Write to temp file and use FromFile (handles JSON parsing correctly)
-        var tempFilePath = Path.Combine(Path.GetTempPath(), $"firebase-cred-{Guid.NewGuid()}.json");
-        try
-        {
-            File.WriteAllText(tempFilePath, fixedJson);
-            credential = GoogleCredential.FromFile(tempFilePath);
-            Console.WriteLine("[Auth] Successfully loaded Firebase credentials from environment variable.");
-        }
-        finally
-        {
-            try
-            {
-                if (File.Exists(tempFilePath)) File.Delete(tempFilePath);
-            }
-            catch { /* Ignore cleanup errors */ }
-        }
+        // Serialize back to JSON - JsonConvert will escape newlines as \n (correct for JSON)
+        var fixedJson = Newtonsoft.Json.JsonConvert.SerializeObject(jobject);
+        
+        // Use GoogleCredential.FromJson directly (production standard approach)
+        credential = GoogleCredential.FromJson(fixedJson);
+        
+        Console.WriteLine("[Auth] Successfully loaded Firebase credentials from environment variable.");
     }
     catch (Newtonsoft.Json.JsonException jsonEx)
     {
