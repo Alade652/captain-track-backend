@@ -35,35 +35,78 @@ GoogleCredential credential;
 if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 {
     // Production/Render: Load from JSON string in environment variable
+    // This is the proven production approach: fix JSON string directly, write to temp file, use FromFile
     try 
     {
-        // Parse JSON to fix escaped newlines in private_key
+        // Validate JSON is parseable
         var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
-        
-        // Fix escaped newlines in private_key (common when stored as environment variable)
-        if (jobject["private_key"] != null)
+        if (jobject["private_key"] == null || jobject["client_email"] == null)
         {
-            var privateKey = jobject["private_key"]?.ToString();
-            if (!string.IsNullOrEmpty(privateKey) && privateKey.Contains("\\n"))
-            {
-                // Replace escaped newlines with actual newlines
-                privateKey = privateKey.Replace("\\n", "\n");
-                jobject["private_key"] = privateKey;
-            }
+            throw new InvalidOperationException(
+                "FIREBASE_SERVICE_ACCOUNT_JSON must contain 'private_key' and 'client_email' fields.");
         }
         
-        // Convert back to JSON string with fixed private_key
-        var fixedJson = jobject.ToString(Newtonsoft.Json.Formatting.None);
+        // Fix escaped newlines in private_key field
+        // When JSON is stored as env var, newlines can be double-escaped (\\n) or single-escaped (\n)
+        // GoogleCredential.FromJson expects single-escaped \n in JSON string
+        // Strategy: Find private_key value and ensure it has \n (not \\n)
+        string fixedJson = firebaseServiceAccountJson;
         
-        // Use the standard GoogleCredential.FromJson method (production-ready approach)
-        credential = GoogleCredential.FromJson(fixedJson);
+        // Use regex to find private_key field value (handles multiline keys)
+        var privateKeyPattern = new System.Text.RegularExpressions.Regex(
+            @"""private_key""\s*:\s*""([^""]*(?:\\.[^""]*)*)""",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
         
-        Console.WriteLine("[Auth] Successfully loaded Firebase credentials from environment variable.");
+        fixedJson = privateKeyPattern.Replace(firebaseServiceAccountJson, match =>
+        {
+            var keyValue = match.Groups[1].Value;
+            
+            // Fix double-escaped newlines: \\n -> \n (for JSON, we want \n not \\n)
+            // Also handle other escape scenarios
+            keyValue = keyValue.Replace("\\\\n", "\\n")    // Double-escaped -> single-escaped
+                              .Replace("\\\\r\\\\n", "\\n") // Double-escaped CRLF
+                              .Replace("\\\\r", "\\n")       // Double-escaped CR
+                              .Replace("\\\\\\\\", "\\\\"); // Double-escaped backslash -> single
+            
+            // Validate the key will parse correctly by checking it starts with BEGIN when unescaped
+            var unescapedForValidation = keyValue.Replace("\\n", "\n").Replace("\\r", "\n");
+            if (!unescapedForValidation.TrimStart().StartsWith("-----BEGIN"))
+            {
+                throw new InvalidOperationException(
+                    "Invalid private key format in FIREBASE_SERVICE_ACCOUNT_JSON. " +
+                    "Private key must be PEM format starting with '-----BEGIN PRIVATE KEY-----'");
+            }
+            
+            return $@"""private_key"":""{keyValue}""";
+        });
+        
+        // Write to temp file and use FromFile (handles JSON parsing correctly)
+        var tempFilePath = Path.Combine(Path.GetTempPath(), $"firebase-cred-{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(tempFilePath, fixedJson);
+            credential = GoogleCredential.FromFile(tempFilePath);
+            Console.WriteLine("[Auth] Successfully loaded Firebase credentials from environment variable.");
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFilePath)) File.Delete(tempFilePath);
+            }
+            catch { /* Ignore cleanup errors */ }
+        }
+    }
+    catch (Newtonsoft.Json.JsonException jsonEx)
+    {
+        throw new InvalidOperationException(
+            $"Invalid JSON in FIREBASE_SERVICE_ACCOUNT_JSON: {jsonEx.Message}", jsonEx);
     }
     catch (Exception ex)
     {
         throw new InvalidOperationException(
-            $"Failed to initialize Firebase credentials from FIREBASE_SERVICE_ACCOUNT_JSON: {ex.Message}", ex);
+            $"Failed to initialize Firebase credentials: {ex.Message}. " +
+            $"Ensure JSON is valid and private_key is properly formatted PEM key.", ex);
     }
 }
 else
