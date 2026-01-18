@@ -60,6 +60,7 @@ if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 
                 jobject["private_key"] = fixedKey;
                 credential = GoogleCredential.FromJson(jobject.ToString());
+            }
             else
             {
                 throw;
