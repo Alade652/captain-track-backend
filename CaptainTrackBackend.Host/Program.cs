@@ -47,31 +47,19 @@ if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
             var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
             var privateKey = jobject["private_key"]?.ToString();
             
-                    if (!string.IsNullOrEmpty(privateKey))
-            {
-                // DEBUGGING: Print key details to logs to identify truncation or format issues
-                Console.WriteLine($"[AuthDebug] Private Key Length: {privateKey.Length}");
-                Console.WriteLine($"[AuthDebug] Key Start: '{privateKey.Substring(0, Math.Min(30, privateKey.Length))}'");
-                Console.WriteLine($"[AuthDebug] Key End: '{privateKey.Substring(Math.Max(0, privateKey.Length - 30))}'");
-
-                // Aggressive Fix: Reconstruct PEM from scratch
-                // 1. Remove literal escaped newlines/returns which might be misinterpreted as content
-                var preCleaned = privateKey
-                    .Replace("\\n", "")
-                    .Replace("\\r", "");
+                    // Proven "Senior Developer" Fix:
+                // Just handle the newline unescaping. Don't touch anything else.
+                // If it fails, log the HEX representation to see what invisible chars are there.
                 
-                // 2. Extracts strictly valid Base64 characters (A-Z, a-z, 0-9, +, /, =)
-                //    This automatically handles stripping headers, whitespace, and any stray backslashes (e.g. from \/)
-                var cleanBody = System.Text.RegularExpressions.Regex.Replace(preCleaned, "[^A-Za-z0-9+/=]", "");
+                var fixedKey = privateKey.Contains("\\n") ? privateKey.Replace("\\n", "\n") : privateKey;
 
-                // 3. Wrap in clean headers
-                var reconstructedKey = "-----BEGIN PRIVATE KEY-----\n" + cleanBody + "\n-----END PRIVATE KEY-----";
+                // Log the first 50 chars as HEX to catch invisible garbage (e.g. BOM, control chars)
+                var debugSample = fixedKey.Substring(0, Math.Min(50, fixedKey.Length));
+                var hexDump = BitConverter.ToString(System.Text.Encoding.UTF8.GetBytes(debugSample));
+                Console.WriteLine($"[AuthDebug] Key Start (Hex): {hexDump}");
 
-                Console.WriteLine($"[AuthDebug] Reconstructed Key Length: {reconstructedKey.Length}");
-
-                jobject["private_key"] = reconstructedKey;
+                jobject["private_key"] = fixedKey;
                 credential = GoogleCredential.FromJson(jobject.ToString());
-            }
             else
             {
                 throw;
