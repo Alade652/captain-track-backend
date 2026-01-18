@@ -35,43 +35,35 @@ GoogleCredential credential;
 if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
 {
     // Production/Render: Load from JSON string in environment variable
-        try 
+    try 
+    {
+        // Parse JSON to fix escaped newlines in private_key
+        var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
+        
+        // Fix escaped newlines in private_key (common when stored as environment variable)
+        if (jobject["private_key"] != null)
         {
-            var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
             var privateKey = jobject["private_key"]?.ToString();
-            var clientEmail = jobject["client_email"]?.ToString();
-            var tokenUri = jobject["token_uri"]?.ToString() ?? "https://oauth2.googleapis.com/token";
-
-            if (!string.IsNullOrEmpty(privateKey) && !string.IsNullOrEmpty(clientEmail))
+            if (!string.IsNullOrEmpty(privateKey) && privateKey.Contains("\\n"))
             {
-                // Fix: Manually unescape the newlines to ensure a real RSA PEM string
-                var fixedKey = privateKey.Contains("\\n") ? privateKey.Replace("\\n", "\n") : privateKey;
-
-                // Senior approach: Use JsonCredentialParameters to bypass string re-serialization issues
-                var parameters = new Google.Apis.Auth.OAuth2.JsonCredentialParameters
-                {
-                    Type = "service_account",
-                    PrivateKey = fixedKey,
-                    ClientEmail = clientEmail,
-                    ProjectId = jobject["project_id"]?.ToString()
-                };
-
-                // Use the internal factory method which is robust across library versions
-                #pragma warning disable CS0618
-                credential = GoogleCredential.FromJsonParameters(parameters);
-                #pragma warning restore CS0618
-                
-                Console.WriteLine("[Auth] Successfully loaded credentials using parameter injection.");
-            }
-            else
-            {
-                throw new InvalidOperationException("Required fields (private_key, client_email) are missing in FIREBASE_SERVICE_ACCOUNT_JSON.");
+                // Replace escaped newlines with actual newlines
+                privateKey = privateKey.Replace("\\n", "\n");
+                jobject["private_key"] = privateKey;
             }
         }
-        catch (Exception)
-        {
-            // If fixing fails, rethrow original to show root cause
-            throw; 
+        
+        // Convert back to JSON string with fixed private_key
+        var fixedJson = jobject.ToString(Newtonsoft.Json.Formatting.None);
+        
+        // Use the standard GoogleCredential.FromJson method (production-ready approach)
+        credential = GoogleCredential.FromJson(fixedJson);
+        
+        Console.WriteLine("[Auth] Successfully loaded Firebase credentials from environment variable.");
+    }
+    catch (Exception ex)
+    {
+        throw new InvalidOperationException(
+            $"Failed to initialize Firebase credentials from FIREBASE_SERVICE_ACCOUNT_JSON: {ex.Message}", ex);
     }
 }
 else
