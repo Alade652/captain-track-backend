@@ -55,17 +55,16 @@ if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
                 Console.WriteLine($"[AuthDebug] Key End: '{privateKey.Substring(Math.Max(0, privateKey.Length - 30))}'");
 
                 // Aggressive Fix: Reconstruct PEM from scratch
-                // 1. Remove Headers (if any) and all whitespace
-                var cleanBody = privateKey
-                    .Replace("-----BEGIN PRIVATE KEY-----", "")
-                    .Replace("-----END PRIVATE KEY-----", "")
-                    .Replace("\\n", "") // Literal \n
-                    .Replace("\n", "")  // Actual newline
-                    .Replace("\r", "")  // Carriage return
-                    .Replace(" ", "")   // Spaces
-                    .Trim();
+                // 1. Remove literal escaped newlines/returns which might be misinterpreted as content
+                var preCleaned = privateKey
+                    .Replace("\\n", "")
+                    .Replace("\\r", "");
+                
+                // 2. Extracts strictly valid Base64 characters (A-Z, a-z, 0-9, +, /, =)
+                //    This automatically handles stripping headers, whitespace, and any stray backslashes (e.g. from \/)
+                var cleanBody = System.Text.RegularExpressions.Regex.Replace(preCleaned, "[^A-Za-z0-9+/=]", "");
 
-                // 2. Wrap in clean headers
+                // 3. Wrap in clean headers
                 var reconstructedKey = "-----BEGIN PRIVATE KEY-----\n" + cleanBody + "\n-----END PRIVATE KEY-----";
 
                 Console.WriteLine($"[AuthDebug] Reconstructed Key Length: {reconstructedKey.Length}");
