@@ -47,13 +47,17 @@ if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
             var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
             var privateKey = jobject["private_key"]?.ToString();
             
-            if (!string.IsNullOrEmpty(privateKey))
+                if (!string.IsNullOrEmpty(privateKey))
             {
-                // Fix: Replace literal "\n" string with actual newline character, 
-                // and handle potential double-escaping which causes PEM parsing failure
-                var fixedKey = privateKey.Contains("\\n") 
-                    ? privateKey.Replace("\\n", "\n") 
-                    : privateKey;
+                // Fix: Robustly fix common escaping issues:
+                // 1. Unescape double-escaped newlines (\\n -> \n)
+                // 2. Handle double-escaped carriage returns (\\r -> remove)
+                // 3. Remove standard carriage returns (\r) to normalize to simple \n
+                var fixedKey = privateKey
+                    .Replace("\\r\\n", "\n")
+                    .Replace("\\n", "\n")
+                    .Replace("\\r", "")
+                    .Replace("\r", "");
                     
                 jobject["private_key"] = fixedKey;
                 credential = GoogleCredential.FromJson(jobject.ToString());
