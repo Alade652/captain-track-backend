@@ -1,0 +1,6 @@
+@CaptainTrackBackend.Host_HostAddress = http://localhost:5077
+
+GET {{CaptainTrackBackend.Host_HostAddress}}
+Accept: application/json
+
+###

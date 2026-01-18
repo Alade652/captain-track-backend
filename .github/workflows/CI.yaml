@@ -1,0 +1,15 @@
+# This workflow is yet to be configured - used as a placeholder action file.
+# When triggered manually, it will only checkout the repository.
+
+name: CI pipeline
+
+on:
+  workflow_dispatch:
+
+jobs: 
+  job-name:
+    runs-on: ubuntu-latest
+
+    steps: 
+    - name: Clone repository
+      uses: actions/checkout@v4

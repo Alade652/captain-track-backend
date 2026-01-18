@@ -1,0 +1,1117 @@
+{
+	"info": {
+		"_postman_id": "dry-cleaning-collection-001",
+		"name": "CaptainTrack - Dry Cleaning Flow",
+		"description": "Complete API collection for testing the dry cleaning service booking flow from registration to completion",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Customer Registration",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.userId) {",
+									"        pm.collectionVariables.set('userId', jsonData.data.userId);",
+									"        pm.collectionVariables.set('customerId', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"Password123!\",\n  \"phoneNumber\": \"+2348012345678\",\n  \"address\": \"123 Main Street, Lagos, Nigeria\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/customer/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"customer",
+								"register"
+							]
+						},
+						"description": "Register a new customer account"
+					}
+				},
+				{
+					"name": "Service Provider Registration",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.userId) {",
+									"        pm.collectionVariables.set('providerUserId', jsonData.data.userId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Jane Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"password\": \"Password123!\",\n  \"phoneNumber\": \"+2348012345679\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/serviceProviderEmailVerification",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"serviceProviderEmailVerification"
+							]
+						},
+						"description": "Register a service provider account"
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.token) {",
+									"        pm.collectionVariables.set('token', jsonData.data.token);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login?email={{email}}&password={{password}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							],
+							"query": [
+								{
+									"key": "email",
+									"value": "{{email}}"
+								},
+								{
+									"key": "password",
+									"value": "{{password}}"
+								}
+							]
+						},
+						"description": "Login to get authentication token"
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "\"{{token}}\""
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/logout",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Logout and blacklist token"
+					}
+				}
+			],
+			"description": "Authentication endpoints for customers and service providers"
+		},
+		{
+			"name": "2. Dry Cleaner Registration",
+			"item": [
+				{
+					"name": "Register Store Owner",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.collectionVariables.set('dryCleanerId', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "BusinessName",
+									"value": "Clean Dry Services",
+									"type": "text"
+								},
+								{
+									"key": "AddressorLocation",
+									"value": "123 Main St, Lagos, Nigeria",
+									"type": "text"
+								},
+								{
+									"key": "PhoneNumber",
+									"value": "+2348012345678",
+									"type": "text"
+								},
+								{
+									"key": "ServiceProviderRole",
+									"value": "StoreOwner",
+									"type": "text"
+								},
+								{
+									"key": "IsAvailable",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaner/registerStoreOwner/{{providerUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaner",
+								"registerStoreOwner",
+								"{{providerUserId}}"
+							]
+						},
+						"description": "Register a dry cleaner store owner"
+					}
+				},
+				{
+					"name": "Register Freelancer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.collectionVariables.set('dryCleanerId', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "AddressorLocation",
+									"value": "456 Park Ave, Lagos, Nigeria",
+									"type": "text"
+								},
+								{
+									"key": "PhoneNumber",
+									"value": "+2348012345679",
+									"type": "text"
+								},
+								{
+									"key": "ServiceProviderRole",
+									"value": "Freelancer",
+									"type": "text"
+								},
+								{
+									"key": "IsAvailable",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaner/registerFreelancer/{{providerUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaner",
+								"registerFreelancer",
+								"{{providerUserId}}"
+							]
+						},
+						"description": "Register a freelancer dry cleaner"
+					}
+				},
+				{
+					"name": "Get All Dry Cleaners",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaner/getAll",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaner",
+								"getAll"
+							]
+						},
+						"description": "Get all registered dry cleaners"
+					}
+				},
+				{
+					"name": "Get Dry Cleaner By User ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaner/getByUserId/{{providerUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaner",
+								"getByUserId",
+								"{{providerUserId}}"
+							]
+						},
+						"description": "Get dry cleaner details by user ID"
+					}
+				}
+			],
+			"description": "Dry cleaner registration and management endpoints"
+		},
+		{
+			"name": "3. Items Management",
+			"item": [
+				{
+					"name": "Get All Items",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.length > 0) {",
+									"        pm.collectionVariables.set('itemId', jsonData.data[0].id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerItem/getItems",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerItem",
+								"getItems"
+							]
+						},
+						"description": "Get all available laundry items"
+					}
+				},
+				{
+					"name": "Get Dry Cleaner Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerItem/getItems/{{providerUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerItem",
+								"getItems",
+								"{{providerUserId}}"
+							]
+						},
+						"description": "Get items for a specific dry cleaner"
+					}
+				},
+				{
+					"name": "Add Item to Dry Cleaner",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerItem/addDryCleanerItem/{{providerUserId}}?itemId={{itemId}}&price=500.00",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerItem",
+								"addDryCleanerItem",
+								"{{providerUserId}}"
+							],
+							"query": [
+								{
+									"key": "itemId",
+									"value": "{{itemId}}"
+								},
+								{
+									"key": "price",
+									"value": "500.00"
+								}
+							]
+						},
+						"description": "Add an item to dry cleaner's catalog with custom price"
+					}
+				},
+				{
+					"name": "Add New Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "Name",
+									"value": "Suit",
+									"type": "text"
+								},
+								{
+									"key": "Description",
+									"value": "Professional suit dry cleaning",
+									"type": "text"
+								},
+								{
+									"key": "Price",
+									"value": "1500.00",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerItem/addItem",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerItem",
+								"addItem"
+							]
+						},
+						"description": "Add a new laundry item to the system"
+					}
+				}
+			],
+			"description": "Manage laundry items for dry cleaning services"
+		},
+		{
+			"name": "4. Packages Management",
+			"item": [
+				{
+					"name": "Get All Packages",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.length > 0) {",
+									"        pm.collectionVariables.set('packageId', jsonData.data[0].id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerPackage/getPackages",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerPackage",
+								"getPackages"
+							]
+						},
+						"description": "Get all available packages"
+					}
+				},
+				{
+					"name": "Get Dry Cleaner Packages",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerPackage/getPackages/{{providerUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerPackage",
+								"getPackages",
+								"{{providerUserId}}"
+							]
+						},
+						"description": "Get packages for a specific dry cleaner"
+					}
+				},
+				{
+					"name": "Add Package (Store Owner)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "Name",
+									"value": "Standard Package",
+									"type": "text"
+								},
+								{
+									"key": "Description",
+									"value": "Standard dry cleaning package",
+									"type": "text"
+								},
+								{
+									"key": "ExtraCharge",
+									"value": "200.00",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerPackage/add/{{providerUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerPackage",
+								"add",
+								"{{providerUserId}}"
+							]
+						},
+						"description": "Add a package for store owner"
+					}
+				},
+				{
+					"name": "Add Package (System)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "Name",
+									"value": "Premium Package",
+									"type": "text"
+								},
+								{
+									"key": "Description",
+									"value": "Premium dry cleaning package",
+									"type": "text"
+								},
+								{
+									"key": "ExtraCharge",
+									"value": "500.00",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleanerPackage/add",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleanerPackage",
+								"add"
+							]
+						},
+						"description": "Add a system-wide package"
+					}
+				}
+			],
+			"description": "Manage dry cleaning packages"
+		},
+		{
+			"name": "5. Booking Flow",
+			"item": [
+				{
+					"name": "Init Book (With Specific Dry Cleaner)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.drycleaningId) {",
+									"        pm.collectionVariables.set('dryCleaningId', jsonData.data.drycleaningId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"packageId\": \"{{packageId}}\",\n  \"deliveryDate\": \"2024-12-25T10:00:00Z\",\n  \"location\": \"789 Customer St, Lagos, Nigeria\",\n  \"dryCleaningItems\": [\n    {\n      \"itemId\": \"{{itemId}}\",\n      \"quantity\": 2\n    },\n    {\n      \"itemId\": \"{{itemId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/initBook/{{customerId}}/{{providerUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"initBook",
+								"{{customerId}}",
+								"{{providerUserId}}"
+							]
+						},
+						"description": "Initialize booking with a specific dry cleaner (store owner)"
+					}
+				},
+				{
+					"name": "Init Book (Freelancer - No Specific Provider)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.drycleaningId) {",
+									"        pm.collectionVariables.set('dryCleaningId', jsonData.data.drycleaningId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"packageId\": \"{{packageId}}\",\n  \"deliveryDate\": \"2024-12-25T10:00:00Z\",\n  \"location\": \"789 Customer St, Lagos, Nigeria\",\n  \"dryCleaningItems\": [\n    {\n      \"itemId\": \"{{itemId}}\",\n      \"quantity\": 2\n    },\n    {\n      \"itemId\": \"{{itemId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/initBook/{{customerId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"initBook",
+								"{{customerId}}"
+							]
+						},
+						"description": "Initialize booking without specific provider (notifies nearby freelancers)"
+					}
+				},
+				{
+					"name": "Book (Confirm Booking)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    console.log('Booking Status:', jsonData.data.status);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/book/{{dryCleaningId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"book",
+								"{{dryCleaningId}}"
+							]
+						},
+						"description": "Confirm the booking. If dryCleanerId exists, status becomes 'Booked'. Otherwise, status becomes 'Pending' and notifies providers."
+					}
+				},
+				{
+					"name": "Get Pending Bookings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/getPending/456%20Park%20Ave,%20Lagos",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"getPending",
+								"456 Park Ave, Lagos"
+							]
+						},
+						"description": "Get pending bookings within 5km of provider location"
+					}
+				},
+				{
+					"name": "Get All Bookings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/getBookings/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"getBookings",
+								"{{userId}}"
+							]
+						},
+						"description": "Get all bookings for a user (customer or provider)"
+					}
+				}
+			],
+			"description": "Booking creation and management endpoints"
+		},
+		{
+			"name": "6. Negotiation & Offers",
+			"item": [
+				{
+					"name": "Accept Offer (Provider Makes Offer)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/accept-Offer/{{dryCleaningId}}?dryCleanerUserId={{providerUserId}}&amount=3500.00",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"accept-Offer",
+								"{{dryCleaningId}}"
+							],
+							"query": [
+								{
+									"key": "dryCleanerUserId",
+									"value": "{{providerUserId}}"
+								},
+								{
+									"key": "amount",
+									"value": "3500.00"
+								}
+							]
+						},
+						"description": "Provider accepts booking with a custom offer amount. Sets status to 'Booked'."
+					}
+				},
+				{
+					"name": "Raise Fare (Customer Negotiates)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/raise-fare/{{dryCleaningId}}?amount=4000.00",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"raise-fare",
+								"{{dryCleaningId}}"
+							],
+							"query": [
+								{
+									"key": "amount",
+									"value": "4000.00"
+								}
+							]
+						},
+						"description": "Customer raises the fare. New amount must be greater than EstimateTotalAmount. Re-notifies providers."
+					}
+				}
+			],
+			"description": "Negotiation and offer management endpoints"
+		},
+		{
+			"name": "7. Booking Actions",
+			"item": [
+				{
+					"name": "Accept Booking (Start Service)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/accept-booking/{{dryCleaningId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"accept-booking",
+								"{{dryCleaningId}}"
+							]
+						},
+						"description": "Provider accepts booking and starts service. Status changes to 'InProgress'."
+					}
+				},
+				{
+					"name": "Cancel Booking",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/DryCleaning/cancel-booking/{{dryCleaningId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"DryCleaning",
+								"cancel-booking",
+								"{{dryCleaningId}}"
+							]
+						},
+						"description": "Cancel a booking. Status changes to 'Cancelled'."
+					}
+				}
+			],
+			"description": "Booking action endpoints (accept, cancel)"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5077",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "customerId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "providerUserId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "dryCleanerId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "itemId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "packageId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "dryCleaningId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "email",
+			"value": "john.doe@example.com",
+			"type": "string"
+		},
+		{
+			"key": "password",
+			"value": "Password123!",
+			"type": "string"
+		}
+	]
+}
+
+
+
+

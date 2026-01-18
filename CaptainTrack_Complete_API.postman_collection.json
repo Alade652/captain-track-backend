@@ -1,0 +1,678 @@
+{
+	"info": {
+		"_postman_id": "captaintrack-complete-api-001",
+		"name": "CaptainTrack - Complete API Collection",
+		"description": "Comprehensive API collection for all CaptainTrack endpoints including authentication, customers, all service providers, payments, ratings, and location services",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Customer Registration",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.userId) {",
+									"        pm.collectionVariables.set('userId', jsonData.data.userId);",
+									"        pm.collectionVariables.set('customerId', jsonData.data.id);",
+									"        pm.collectionVariables.set('email', jsonData.data.email);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"Password123!\",\n  \"phoneNumber\": \"+2348012345678\",\n  \"address\": \"123 Main Street, Lagos, Nigeria\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/customer/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customer", "register"]
+						}
+					}
+				},
+				{
+					"name": "Service Provider Registration",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.userId) {",
+									"        pm.collectionVariables.set('providerUserId', jsonData.data.userId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Jane Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"password\": \"Password123!\",\n  \"phoneNumber\": \"+2348012345679\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/serviceProviderEmailVerification",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "serviceProviderEmailVerification"]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.token) {",
+									"        pm.collectionVariables.set('token', jsonData.data.token);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login?email={{email}}&password={{password}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"],
+							"query": [
+								{"key": "email", "value": "{{email}}"},
+								{"key": "password", "value": "{{password}}"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Generate OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data) {",
+									"        pm.collectionVariables.set('otp', jsonData.data.toString());",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/genarateOTP?userId={{userId}}&email={{email}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "genarateOTP"],
+							"query": [
+								{"key": "userId", "value": "{{userId}}", "disabled": true},
+								{"key": "email", "value": "{{email}}", "disabled": true}
+							]
+						}
+					}
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/verifyOTP?otp={{otp}}&userId={{userId}}&email={{email}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "verifyOTP"],
+							"query": [
+								{"key": "otp", "value": "{{otp}}"},
+								{"key": "userId", "value": "{{userId}}"},
+								{"key": "email", "value": "{{email}}"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/resetPassword/{{email}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "resetPassword", "{{email}}"]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "\"{{token}}\""
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "logout"]
+						}
+					}
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/deleteUser/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "deleteUser", "{{userId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Customer",
+			"item": [
+				{
+					"name": "Get Customer by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/customer/get/{{customerId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customer", "get", "{{customerId}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Customer by User ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/customer/getByUserId/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customer", "getByUserId", "{{userId}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Customer by Email",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/customer/getByEmail/{{email}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customer", "getByEmail", "{{email}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Customer",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Smith\",\n  \"email\": \"john.smith@example.com\",\n  \"phoneNumber\": \"+2348012345679\",\n  \"address\": \"456 New Street, Lagos, Nigeria\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/customer/update/{{customerId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customer", "update", "{{customerId}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete Customer",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/customer/delete/{{customerId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "customer", "delete", "{{customerId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Admin",
+			"item": [
+				{
+					"name": "Create Admin",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@captaintrack.com\",\n  \"password\": \"Admin123!\",\n  \"fullName\": \"Admin User\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/admin/Create",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "admin", "Create"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Payment",
+			"item": [
+				{
+					"name": "Initiate Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 5000,\n  \"redirectUrl\": \"https://yourdomain.com/payment/callback\",\n  \"paymentTitle\": \"Service Payment\",\n  \"paymentDescription\": \"Payment for service booking\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payment/initiate/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payment", "initiate", "{{userId}}"]
+						}
+					}
+				},
+				{
+					"name": "Payment Callback",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/api/payment/callback?transaction_id=TRANSACTION_ID",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payment", "callback"],
+							"query": [
+								{"key": "transaction_id", "value": "TRANSACTION_ID"}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Ratings",
+			"item": [
+				{
+					"name": "Create Rating",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vendorUserId\": \"{{providerUserId}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"rating\": 5,\n  \"comment\": \"Excellent service!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ratings/create/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ratings", "create", "{{userId}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Customer Ratings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/ratings/getCustomerRatings/{{customerId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ratings", "getCustomerRatings", "{{customerId}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Vendor Ratings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/ratings/getVendorRatings/{{providerUserId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ratings", "getVendorRatings", "{{providerUserId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Location & Maps",
+			"item": [
+				{
+					"name": "Send Location",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/location/send-location/{{userId}}?latitude=6.5244&longitude=3.3792",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "location", "send-location", "{{userId}}"],
+							"query": [
+								{"key": "latitude", "value": "6.5244"},
+								{"key": "longitude", "value": "3.3792"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Location",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/location/get-location/{{userId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "location", "get-location", "{{userId}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Distance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/map/getDistance?origin=Lagos&destination=Abuja",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "map", "getDistance"],
+							"query": [
+								{"key": "origin", "value": "Lagos"},
+								{"key": "destination", "value": "Abuja"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Coordinates",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/map/getCordinates?address=Lagos, Nigeria",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "map", "getCordinates"],
+							"query": [
+								{"key": "address", "value": "Lagos, Nigeria"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Address",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/map/getAddress?lat=6.5244&lng=3.3792",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "map", "getAddress"],
+							"query": [
+								{"key": "lat", "value": "6.5244"},
+								{"key": "lng", "value": "3.3792"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Time Zone",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/map/getTimeZone?lat=6.5244&lng=3.3792",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "map", "getTimeZone"],
+							"query": [
+								{"key": "lat", "value": "6.5244"},
+								{"key": "lng", "value": "3.3792"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Send Location (Map)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/map/sendLocation/{{userId}}?lat=6.5244&lng=3.3792",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "map", "sendLocation", "{{userId}}"],
+							"query": [
+								{"key": "lat", "value": "6.5244"},
+								{"key": "lng", "value": "3.3792"}
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5077",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "customerId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "providerUserId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "email",
+			"value": "john.doe@example.com",
+			"type": "string"
+		},
+		{
+			"key": "password",
+			"value": "Password123!",
+			"type": "string"
+		},
+		{
+			"key": "otp",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
+
+

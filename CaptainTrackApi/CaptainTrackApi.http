@@ -1,0 +1,11 @@
+@CaptainTrackApi_HostAddress = http://localhost:5208
+
+GET {{CaptainTrackApi_HostAddress}}/todos/
+Accept: application/json
+
+###
+
+GET {{CaptainTrackApi_HostAddress}}/todos/1
+Accept: application/json
+
+###
