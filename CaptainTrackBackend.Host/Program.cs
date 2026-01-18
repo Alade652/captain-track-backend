@@ -47,7 +47,9 @@ if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
             var jobject = Newtonsoft.Json.Linq.JObject.Parse(firebaseServiceAccountJson);
             var privateKey = jobject["private_key"]?.ToString();
             
-                    // Proven "Senior Developer" Fix:
+            if (!string.IsNullOrEmpty(privateKey))
+            {
+                // Proven "Senior Developer" Fix:
                 // Just handle the newline unescaping. Don't touch anything else.
                 // If it fails, log the HEX representation to see what invisible chars are there.
                 
@@ -63,7 +65,7 @@ if (!string.IsNullOrEmpty(firebaseServiceAccountJson))
             }
             else
             {
-                throw;
+                throw new InvalidOperationException("Private key is missing in FIREBASE_SERVICE_ACCOUNT_JSON.");
             }
         }
         catch (Exception)
