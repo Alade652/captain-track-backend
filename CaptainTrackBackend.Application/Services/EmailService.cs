@@ -42,20 +42,49 @@ namespace CaptainTrackBackend.Application.Services
                 };
             }
 
-            // Check if SendGrid API key is configured (preferred method)
-            var sendGridApiKey = _configuration["SendGrid:ApiKey"] 
-                ?? Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
+            // Check if SendGrid API key is configured
+            // Priority: Environment variable > appsettings.json
+            // Environment variables should override config files (especially for production)
+            var sendGridApiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY")
+                ?? _configuration["SendGrid:ApiKey"];
+            
+            // Check if it's a placeholder value from appsettings.json
+            if (!string.IsNullOrWhiteSpace(sendGridApiKey) && 
+                (sendGridApiKey.Contains("YOUR_SENDGRID", StringComparison.OrdinalIgnoreCase) ||
+                 sendGridApiKey.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase)))
+            {
+                _logger.LogWarning("SendGrid API key appears to be a placeholder value. Checking environment variable...");
+                sendGridApiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
+            }
             
             if (!string.IsNullOrWhiteSpace(sendGridApiKey))
             {
+                // Trim whitespace that might have been accidentally added
+                sendGridApiKey = sendGridApiKey.Trim();
+                
+                // Log which source was used (for debugging)
+                var source = Environment.GetEnvironmentVariable("SENDGRID_API_KEY") != null 
+                    ? "environment variable" 
+                    : "appsettings.json";
+                _logger.LogInformation("SendGrid API key loaded from {Source}", source);
+                
                 // Validate API key format (should start with "SG.")
                 if (!sendGridApiKey.StartsWith("SG.", StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger.LogWarning("SendGrid API key format appears invalid (should start with 'SG.'). Falling back to SMTP.");
+                    // Show first 10 characters (masked) for debugging
+                    var maskedKey = sendGridApiKey.Length > 10 
+                        ? sendGridApiKey.Substring(0, 10) + "..." 
+                        : sendGridApiKey;
+                    _logger.LogWarning(
+                        "SendGrid API key format appears invalid (should start with 'SG.'). " +
+                        "Key starts with: '{MaskedKey}' (length: {Length} chars, source: {Source}). " +
+                        "Please check your SENDGRID_API_KEY environment variable in Render. Falling back to SMTP.",
+                        maskedKey, sendGridApiKey.Length, source);
                 }
                 else
                 {
-                    _logger.LogInformation("SendGrid API key found (length: {Length} chars). Using SendGrid API.", sendGridApiKey.Length);
+                    _logger.LogInformation("SendGrid API key found (length: {Length} chars, starts with 'SG.', source: {Source}). Using SendGrid API.", 
+                        sendGridApiKey.Length, source);
                     return await SendEmailViaSendGridAsync(emailDto, sendGridApiKey);
                 }
             }
@@ -258,9 +287,9 @@ namespace CaptainTrackBackend.Application.Services
             Exception? lastException = null;
             for (int attempt = 1; attempt <= MaxRetries; attempt++)
             {
-                using var client = new SmtpClient();
-                try
-                {
+            using var client = new SmtpClient();
+            try
+            {
                     // Set timeout
                     client.Timeout = timeoutSeconds * 1000; // Convert to milliseconds
 
@@ -276,13 +305,13 @@ namespace CaptainTrackBackend.Application.Services
                     
                     _logger.LogInformation("Email sent successfully to {To} on attempt {Attempt}", 
                         emailDto.To, attempt);
-                    
-                    return new Response<EmailDto>
-                    {
-                        Message = "Email sent successfully",
-                        Success = true,
-                        Data = emailDto
-                    };
+
+            return new Response<EmailDto>
+            {
+                Message = "Email sent successfully",
+                Success = true,
+                Data = emailDto
+            };
                 }
                 catch (OperationCanceledException ex) when (ex.InnerException is TimeoutException)
                 {
