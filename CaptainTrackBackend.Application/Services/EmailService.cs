@@ -48,7 +48,20 @@ namespace CaptainTrackBackend.Application.Services
             
             if (!string.IsNullOrWhiteSpace(sendGridApiKey))
             {
-                return await SendEmailViaSendGridAsync(emailDto, sendGridApiKey);
+                // Validate API key format (should start with "SG.")
+                if (!sendGridApiKey.StartsWith("SG.", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning("SendGrid API key format appears invalid (should start with 'SG.'). Falling back to SMTP.");
+                }
+                else
+                {
+                    _logger.LogInformation("SendGrid API key found (length: {Length} chars). Using SendGrid API.", sendGridApiKey.Length);
+                    return await SendEmailViaSendGridAsync(emailDto, sendGridApiKey);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("SendGrid API key not configured. Falling back to SMTP.");
             }
 
             // Fallback to SMTP
@@ -60,6 +73,29 @@ namespace CaptainTrackBackend.Application.Services
             try
             {
                 _logger.LogInformation("Sending email to {To} via SendGrid API", emailDto.To);
+
+                // Validate API key format
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    _logger.LogError("SendGrid API key is null or empty");
+                    return new Response<EmailDto>
+                    {
+                        Message = "SendGrid API key is not configured.",
+                        Success = false,
+                        Data = null
+                    };
+                }
+
+                if (!apiKey.StartsWith("SG.", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogError("SendGrid API key format is invalid. API key should start with 'SG.'");
+                    return new Response<EmailDto>
+                    {
+                        Message = "SendGrid API key format is invalid. Please check your SENDGRID_API_KEY environment variable.",
+                        Success = false,
+                        Data = null
+                    };
+                }
 
                 var client = new SendGridClient(apiKey);
                 
@@ -105,9 +141,24 @@ namespace CaptainTrackBackend.Application.Services
                     _logger.LogError("SendGrid API error. Status: {StatusCode}, Body: {Body}", 
                         response.StatusCode, responseBody);
                     
+                    // Provide helpful error messages for common issues
+                    string errorMessage = response.StatusCode switch
+                    {
+                        System.Net.HttpStatusCode.Unauthorized => 
+                            "SendGrid API key is invalid, expired, or revoked. Please verify your SENDGRID_API_KEY environment variable in Render dashboard and ensure the API key has 'Mail Send' permissions.",
+                        System.Net.HttpStatusCode.Forbidden => 
+                            "SendGrid API key does not have required permissions. Please ensure the API key has 'Mail Send' permission in SendGrid dashboard.",
+                        System.Net.HttpStatusCode.BadRequest => 
+                            $"SendGrid request is invalid: {responseBody}",
+                        _ => 
+                            $"SendGrid API error: {response.StatusCode}. {responseBody}"
+                    };
+                    
+                    _logger.LogError("SendGrid error details: {ErrorMessage}", errorMessage);
+                    
                     return new Response<EmailDto>
                     {
-                        Message = $"SendGrid API error: {response.StatusCode}. {responseBody}",
+                        Message = errorMessage,
                         Success = false,
                         Data = null
                     };
