@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using MimeKit;
 using MailKit.Net.Smtp;
 using System.Net;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace CaptainTrackBackend.Application.Services
 {
@@ -39,6 +41,92 @@ namespace CaptainTrackBackend.Application.Services
                     Data = null
                 };
             }
+
+            // Check if SendGrid API key is configured (preferred method)
+            var sendGridApiKey = _configuration["SendGrid:ApiKey"] 
+                ?? Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
+            
+            if (!string.IsNullOrWhiteSpace(sendGridApiKey))
+            {
+                return await SendEmailViaSendGridAsync(emailDto, sendGridApiKey);
+            }
+
+            // Fallback to SMTP
+            return await SendEmailViaSmtpAsync(emailDto);
+        }
+
+        private async Task<Response<EmailDto>> SendEmailViaSendGridAsync(EmailDto emailDto, string apiKey)
+        {
+            try
+            {
+                _logger.LogInformation("Sending email to {To} via SendGrid API", emailDto.To);
+
+                var client = new SendGridClient(apiKey);
+                
+                var fromEmail = _configuration["SendGrid:FromEmail"] 
+                    ?? Environment.GetEnvironmentVariable("SENDGRID_FROM_EMAIL")
+                    ?? _configuration["SmtpSettings:FromEmail"]
+                    ?? Environment.GetEnvironmentVariable("SMTP_FROM_EMAIL");
+                
+                if (string.IsNullOrWhiteSpace(fromEmail))
+                {
+                    _logger.LogError("SendGrid FromEmail is not configured. Please set SendGrid:FromEmail or SENDGRID_FROM_EMAIL environment variable.");
+                    return new Response<EmailDto>
+                    {
+                        Message = "SendGrid FromEmail is not configured.",
+                        Success = false,
+                        Data = null
+                    };
+                }
+
+                var from = new EmailAddress(fromEmail);
+                var to = new EmailAddress(emailDto.To);
+                var subject = emailDto.Subject;
+                var htmlContent = emailDto.Body;
+                var plainTextContent = System.Text.RegularExpressions.Regex.Replace(htmlContent, "<[^>]*>", ""); // Strip HTML for plain text
+
+                var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
+                
+                var response = await client.SendEmailAsync(msg);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Email sent successfully to {To} via SendGrid", emailDto.To);
+                    return new Response<EmailDto>
+                    {
+                        Message = "Email sent successfully",
+                        Success = true,
+                        Data = emailDto
+                    };
+                }
+                else
+                {
+                    var responseBody = await response.Body.ReadAsStringAsync();
+                    _logger.LogError("SendGrid API error. Status: {StatusCode}, Body: {Body}", 
+                        response.StatusCode, responseBody);
+                    
+                    return new Response<EmailDto>
+                    {
+                        Message = $"SendGrid API error: {response.StatusCode}. {responseBody}",
+                        Success = false,
+                        Data = null
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send email via SendGrid to {To}: {Message}", emailDto.To, ex.Message);
+                return new Response<EmailDto>
+                {
+                    Message = $"Failed to send email via SendGrid: {ex.Message}",
+                    Success = false,
+                    Data = null
+                };
+            }
+        }
+
+        private async Task<Response<EmailDto>> SendEmailViaSmtpAsync(EmailDto emailDto)
+        {
             
             // Get SMTP settings from configuration (supports environment variables)
             // Environment variables override appsettings.json
