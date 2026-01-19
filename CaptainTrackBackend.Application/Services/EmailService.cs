@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MimeKit;
 using MailKit.Net.Smtp;
+using System.Net;
 
 namespace CaptainTrackBackend.Application.Services
 {
@@ -12,6 +13,8 @@ namespace CaptainTrackBackend.Application.Services
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<EmailService> _logger;
+        private const int DefaultTimeoutSeconds = 30;
+        private const int MaxRetries = 3;
         
         public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
         {
@@ -85,7 +88,21 @@ namespace CaptainTrackBackend.Application.Services
                 port = 587; // Default Gmail port
             }
 
-            _logger.LogInformation("Attempting to send email to {To} via {Host}:{Port}", emailDto.To, host, port);
+            // Get timeout from configuration (default: 30 seconds)
+            var timeoutStr = _configuration["SmtpSettings:Timeout"] 
+                ?? Environment.GetEnvironmentVariable("SMTP_TIMEOUT");
+            if (!int.TryParse(timeoutStr, out int timeoutSeconds) || timeoutSeconds <= 0)
+            {
+                timeoutSeconds = DefaultTimeoutSeconds;
+            }
+
+            // Determine secure socket options based on port
+            var secureSocketOptions = port == 465 
+                ? SecureSocketOptions.SslOnConnect 
+                : SecureSocketOptions.StartTls;
+
+            _logger.LogInformation("Attempting to send email to {To} via {Host}:{Port} (timeout: {Timeout}s)", 
+                emailDto.To, host, port, timeoutSeconds);
 
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(fromEmail, fromEmail));
@@ -98,37 +115,109 @@ namespace CaptainTrackBackend.Application.Services
             };
             message.Body = bodyBuilder.ToMessageBody();
 
-            using var client = new SmtpClient();
-            try
+            // Retry logic for transient failures
+            Exception? lastException = null;
+            for (int attempt = 1; attempt <= MaxRetries; attempt++)
             {
-                await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
-                await client.AuthenticateAsync(username, password);
-                await client.SendAsync(message);
-                _logger.LogInformation("Email sent successfully to {To}", emailDto.To);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send email to {To}. Error: {Message}", emailDto.To, ex.Message);
-                return new Response<EmailDto>
+                using var client = new SmtpClient();
+                try
                 {
-                    Message = $"Failed to send email: {ex.Message}",
-                    Success = false,
-                    Data = null
-                };
-            }
-            finally
-            {
-                if (client.IsConnected)
+                    // Set timeout
+                    client.Timeout = timeoutSeconds * 1000; // Convert to milliseconds
+
+                    _logger.LogInformation("Email send attempt {Attempt}/{MaxRetries} to {To}", 
+                        attempt, MaxRetries, emailDto.To);
+
+                    // Connect with timeout
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+                    await client.ConnectAsync(host, port, secureSocketOptions, cts.Token);
+                    
+                    await client.AuthenticateAsync(username, password, cts.Token);
+                    await client.SendAsync(message, cts.Token);
+                    
+                    _logger.LogInformation("Email sent successfully to {To} on attempt {Attempt}", 
+                        emailDto.To, attempt);
+                    
+                    return new Response<EmailDto>
+                    {
+                        Message = "Email sent successfully",
+                        Success = true,
+                        Data = emailDto
+                    };
+                }
+                catch (OperationCanceledException ex) when (ex.InnerException is TimeoutException)
                 {
-                    await client.DisconnectAsync(true);
+                    lastException = ex;
+                    _logger.LogWarning("Email send attempt {Attempt}/{MaxRetries} timed out for {To}", 
+                        attempt, MaxRetries, emailDto.To);
+                    
+                    if (attempt < MaxRetries)
+                    {
+                        var delay = TimeSpan.FromSeconds(2 * attempt); // Exponential backoff
+                        _logger.LogInformation("Retrying after {Delay} seconds...", delay.TotalSeconds);
+                        await Task.Delay(delay);
+                    }
+                }
+                catch (TimeoutException ex)
+                {
+                    lastException = ex;
+                    _logger.LogWarning("Email send attempt {Attempt}/{MaxRetries} timed out for {To}: {Message}", 
+                        attempt, MaxRetries, emailDto.To, ex.Message);
+                    
+                    if (attempt < MaxRetries)
+                    {
+                        var delay = TimeSpan.FromSeconds(2 * attempt);
+                        _logger.LogInformation("Retrying after {Delay} seconds...", delay.TotalSeconds);
+                        await Task.Delay(delay);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    _logger.LogError(ex, "Email send attempt {Attempt}/{MaxRetries} failed for {To}: {Message}", 
+                        attempt, MaxRetries, emailDto.To, ex.Message);
+                    
+                    // Don't retry on authentication errors or invalid email
+                    if (ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase) ||
+                        ex.Message.Contains("invalid", StringComparison.OrdinalIgnoreCase) ||
+                        ex.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        break; // Don't retry authentication errors
+                    }
+                    
+                    if (attempt < MaxRetries)
+                    {
+                        var delay = TimeSpan.FromSeconds(2 * attempt);
+                        _logger.LogInformation("Retrying after {Delay} seconds...", delay.TotalSeconds);
+                        await Task.Delay(delay);
+                    }
+                }
+                finally
+                {
+                    if (client.IsConnected)
+                    {
+                        try
+                        {
+                            await client.DisconnectAsync(true);
+                        }
+                        catch { /* Ignore disconnect errors */ }
+                    }
                 }
             }
 
+            // All retries failed
+            var errorMessage = lastException is TimeoutException || lastException is OperationCanceledException
+                ? $"Email sending timed out after {MaxRetries} attempts. This may be due to network restrictions. Consider using a cloud email service like SendGrid or Mailgun."
+                : $"Failed to send email after {MaxRetries} attempts: {lastException?.Message}";
+
+            _logger.LogError("Failed to send email to {To} after {MaxRetries} attempts. Last error: {Error}", 
+                emailDto.To, MaxRetries, lastException?.Message);
+
             return new Response<EmailDto>
             {
-                Message = "Email sent successfully",
-                Success = true,
-                Data = emailDto
+                Message = errorMessage,
+                Success = false,
+                Data = null
             };
         }
     }
