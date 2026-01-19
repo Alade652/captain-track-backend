@@ -12,6 +12,7 @@ using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.DataProtection;
 using dotenv.net;
 
 
@@ -155,6 +156,18 @@ builder.Services.AddCors(options =>
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 
+// Configure DataProtection to use environment-specific storage
+// On Render, use a persistent directory or disable if not needed
+if (builder.Environment.IsProduction())
+{
+    // Use a persistent directory for DataProtection keys in production
+    var dataProtectionKeysPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEYS_PATH") 
+        ?? Path.Combine(Path.GetTempPath(), "DataProtection-Keys");
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new System.IO.DirectoryInfo(dataProtectionKeysPath));
+}
+
 string connectionString = builder.Configuration.GetConnectionString("CaptainTrackConnectionString");
 //builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseMySql(connectionString, new MySqlServerVersion(new Version(5, 5, 62))));
@@ -233,7 +246,12 @@ app.MapHub<BookingHub>("/bookingHub");
 
 
 
-app.UseHttpsRedirection();
+// HTTPS redirection is handled by Render's load balancer
+// Only enable HTTPS redirection in development
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles(); // To serve uploaded files if needed
 

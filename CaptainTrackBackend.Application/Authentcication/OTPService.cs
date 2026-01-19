@@ -4,6 +4,7 @@ using CaptainTrackBackend.Application.DTO;
 using CaptainTrackBackend.Domain.Entities;
 using CaptainTrackBackend.Domain.Identity;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
 using static System.Net.WebRequestMethods;
 namespace CaptainTrackBackend.Application.Authentcication
@@ -15,12 +16,15 @@ namespace CaptainTrackBackend.Application.Authentcication
         private readonly IEmailService _emailService;
         private readonly IUserRepository _userRepository;
         private readonly ISmsService _smsService;
-        public OTPService(IEmailService emailService, IUserRepository userRepository, IMemoryCache cache, ISmsService smsService)
+        private readonly ILogger<OTPService> _logger;
+        
+        public OTPService(IEmailService emailService, IUserRepository userRepository, IMemoryCache cache, ISmsService smsService, ILogger<OTPService> logger)
         {
             _emailService = emailService;
             _userRepository = userRepository;
             _cache = cache;
             _smsService = smsService;
+            _logger = logger;
         }
 
         public async Task<Response<string>> GenerateOTP(Guid? userId = null, string? email = null /*string? phoneNumber = null*/)
@@ -44,7 +48,15 @@ namespace CaptainTrackBackend.Application.Authentcication
                     Body = $"Hello ,<br/>. This is your OTP {otp}."
                 };
 
-                await _emailService.SendEmailAsync(emailDto);
+                var emailResult = await _emailService.SendEmailAsync(emailDto);
+                if (!emailResult.Success)
+                {
+                    _logger.LogError("Failed to send OTP email to {Email}. Error: {Message}", user.Email, emailResult.Message);
+                    response.Success = false;
+                    response.Message = $"Failed to send OTP email: {emailResult.Message}";
+                    _cache.Remove(userId); // Remove OTP from cache if email failed
+                    return response;
+                }
             }
             else if (email != null)
             {
@@ -58,7 +70,15 @@ namespace CaptainTrackBackend.Application.Authentcication
                     Body = $"Hello ,<br/>. This is your OTP {otp}."
                 };
 
-                await _emailService.SendEmailAsync(emailDto);
+                var emailResult = await _emailService.SendEmailAsync(emailDto);
+                if (!emailResult.Success)
+                {
+                    _logger.LogError("Failed to send OTP email to {Email}. Error: {Message}", email, emailResult.Message);
+                    response.Success = false;
+                    response.Message = $"Failed to send OTP email: {emailResult.Message}";
+                    _cache.Remove(user.Id); // Remove OTP from cache if email failed
+                    return response;
+                }
             }
 /*            else if (phoneNumber != null)
             {
@@ -92,7 +112,11 @@ namespace CaptainTrackBackend.Application.Authentcication
                         Subject = "Welcome to CaptainTrack",
                         Body = $"Hello ,<br/>Thank you for registering with CaptainTrack. Your account has been created successfully."
                     };
-                    await _emailService.SendEmailAsync(emailDto);
+                    var welcomeEmailResult = await _emailService.SendEmailAsync(emailDto);
+                    if (!welcomeEmailResult.Success)
+                    {
+                        _logger.LogWarning("Failed to send welcome email to {Email}, but OTP verification succeeded", user.Email);
+                    }
                     user.OTPVerfication = true;
                     await _userRepository.UpdateAsync(user);
 
