@@ -128,17 +128,41 @@ namespace CaptainTrackBackend.Application.Services
 
                 var client = new SendGridClient(apiKey);
                 
-                var fromEmail = _configuration["SendGrid:FromEmail"] 
-                    ?? Environment.GetEnvironmentVariable("SENDGRID_FROM_EMAIL")
-                    ?? _configuration["SmtpSettings:FromEmail"]
-                    ?? Environment.GetEnvironmentVariable("SMTP_FROM_EMAIL");
+                // Priority: Environment variables > appsettings.json
+                // Environment variables should override config files (especially for production)
+                var fromEmail = Environment.GetEnvironmentVariable("SENDGRID_FROM_EMAIL")
+                    ?? Environment.GetEnvironmentVariable("SMTP_FROM_EMAIL")
+                    ?? _configuration["SendGrid:FromEmail"]
+                    ?? _configuration["SmtpSettings:FromEmail"];
+                
+                // Check if it's a placeholder value from appsettings.json
+                if (!string.IsNullOrWhiteSpace(fromEmail) && 
+                    (fromEmail.Contains("yourdomain.com", StringComparison.OrdinalIgnoreCase) ||
+                     fromEmail.Contains("YOUR_EMAIL", StringComparison.OrdinalIgnoreCase) ||
+                     fromEmail.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger.LogWarning("SendGrid FromEmail appears to be a placeholder value. Checking environment variables...");
+                    fromEmail = Environment.GetEnvironmentVariable("SENDGRID_FROM_EMAIL")
+                        ?? Environment.GetEnvironmentVariable("SMTP_FROM_EMAIL");
+                }
+                
+                // Log which source was used (for debugging)
+                if (!string.IsNullOrWhiteSpace(fromEmail))
+                {
+                    var source = Environment.GetEnvironmentVariable("SENDGRID_FROM_EMAIL") != null 
+                        ? "SENDGRID_FROM_EMAIL environment variable"
+                        : Environment.GetEnvironmentVariable("SMTP_FROM_EMAIL") != null
+                            ? "SMTP_FROM_EMAIL environment variable"
+                            : "appsettings.json";
+                    _logger.LogInformation("SendGrid FromEmail loaded from {Source}: {FromEmail}", source, fromEmail);
+                }
                 
                 if (string.IsNullOrWhiteSpace(fromEmail))
                 {
-                    _logger.LogError("SendGrid FromEmail is not configured. Please set SendGrid:FromEmail or SENDGRID_FROM_EMAIL environment variable.");
+                    _logger.LogError("SendGrid FromEmail is not configured. Please set SENDGRID_FROM_EMAIL environment variable in Render.");
                     return new Response<EmailDto>
                     {
-                        Message = "SendGrid FromEmail is not configured.",
+                        Message = "SendGrid FromEmail is not configured. Please set SENDGRID_FROM_EMAIL environment variable in Render.",
                         Success = false,
                         Data = null
                     };
