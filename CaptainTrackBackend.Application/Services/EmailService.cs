@@ -170,18 +170,36 @@ namespace CaptainTrackBackend.Application.Services
                     _logger.LogError("SendGrid API error. Status: {StatusCode}, Body: {Body}", 
                         response.StatusCode, responseBody);
                     
-                    // Provide helpful error messages for common issues
-                    string errorMessage = response.StatusCode switch
+                    // Parse error message from response body to provide specific guidance
+                    string errorMessage;
+                    
+                    if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     {
-                        System.Net.HttpStatusCode.Unauthorized => 
-                            "SendGrid API key is invalid, expired, or revoked. Please verify your SENDGRID_API_KEY environment variable in Render dashboard and ensure the API key has 'Mail Send' permissions.",
-                        System.Net.HttpStatusCode.Forbidden => 
-                            "SendGrid API key does not have required permissions. Please ensure the API key has 'Mail Send' permission in SendGrid dashboard.",
-                        System.Net.HttpStatusCode.BadRequest => 
-                            $"SendGrid request is invalid: {responseBody}",
-                        _ => 
-                            $"SendGrid API error: {response.StatusCode}. {responseBody}"
-                    };
+                        errorMessage = "SendGrid API key is invalid, expired, or revoked. Please verify your SENDGRID_API_KEY environment variable in Render dashboard and ensure the API key has 'Mail Send' permissions.";
+                    }
+                    else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    {
+                        // Check if it's a sender identity issue vs API permission issue
+                        if (responseBody.Contains("from address does not match a verified Sender Identity", StringComparison.OrdinalIgnoreCase) ||
+                            responseBody.Contains("sender identity", StringComparison.OrdinalIgnoreCase))
+                        {
+                            errorMessage = $"SendGrid sender email '{fromEmail}' is not verified. " +
+                                $"Please verify this email address in SendGrid: https://app.sendgrid.com/settings/sender_auth " +
+                                $"Then ensure SENDGRID_FROM_EMAIL in Render matches the verified email address.";
+                        }
+                        else
+                        {
+                            errorMessage = "SendGrid API key does not have required permissions. Please ensure the API key has 'Mail Send' permission in SendGrid dashboard.";
+                        }
+                    }
+                    else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                    {
+                        errorMessage = $"SendGrid request is invalid: {responseBody}";
+                    }
+                    else
+                    {
+                        errorMessage = $"SendGrid API error: {response.StatusCode}. {responseBody}";
+                    }
                     
                     _logger.LogError("SendGrid error details: {ErrorMessage}", errorMessage);
                     
