@@ -169,8 +169,43 @@ if (builder.Environment.IsProduction())
 }
 
 string connectionString = builder.Configuration.GetConnectionString("CaptainTrackConnectionString");
-//builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(connectionString));
-builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseMySql(connectionString, new MySqlServerVersion(new Version(5, 5, 62))));
+
+// Diagnostics: Print masked connection string to debug the "database ''" error
+if (!string.IsNullOrEmpty(connectionString))
+{
+    var parts = connectionString.Split(';');
+    var maskedParts = parts.Select(p => 
+    {
+        if (p.Trim().StartsWith("password=", StringComparison.OrdinalIgnoreCase)) return "password=******";
+        return p;
+    });
+    Console.WriteLine($"[DBDebug] ConnectionString (Masked): {string.Join(";", maskedParts)}");
+}
+else
+{
+    Console.WriteLine("[DBDebug] ERROR: CaptainTrackConnectionString is NULL or EMPTY.");
+}
+
+builder.Services.AddDbContext<ApplicationDbContext>(options => 
+{
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        // Fallback to avoid crash during startup if missing, though it will fail later
+        options.UseMySql("server=localhost", new MySqlServerVersion(new Version(8, 0, 0)));
+        return;
+    }
+    
+    try 
+    {
+        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[DBDebug] Auto-detection failed: {ex.Message}");
+        // Fallback to a common high version if auto-detect fails (e.g. during build/migration)
+        options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)));
+    }
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
