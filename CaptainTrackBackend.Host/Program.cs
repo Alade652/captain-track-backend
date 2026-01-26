@@ -170,7 +170,7 @@ if (builder.Environment.IsProduction())
 
 // Use a temporary logger for early diagnostics
 using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
-var logger = loggerFactory.CreateLogger("Program");
+var startupLogger = loggerFactory.CreateLogger("Program");
 
 string connectionString = builder.Configuration.GetConnectionString("CaptainTrackConnectionString") 
     ?? builder.Configuration["ConnectionStrings:CaptainTrackConnectionString"]
@@ -185,11 +185,11 @@ if (!string.IsNullOrEmpty(connectionString))
         if (trimmed.StartsWith("password=", StringComparison.OrdinalIgnoreCase)) return "password=******";
         return p;
     });
-    logger.LogInformation("[DBDebug] ConnectionString found (Masked): {ConnectionString}", string.Join(";", maskedParts));
+    startupLogger.LogInformation("[DBDebug] ConnectionString found (Masked): {ConnectionString}", string.Join(";", maskedParts));
 }
 else
 {
-    logger.LogError("[DBDebug] ERROR: CaptainTrackConnectionString is NULL or EMPTY. Checked GetConnectionString, Configuration direct, and Environment Variables.");
+    startupLogger.LogError("[DBDebug] ERROR: CaptainTrackConnectionString is NULL or EMPTY. Checked GetConnectionString, Configuration direct, and Environment Variables.");
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options => 
@@ -206,7 +206,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     }
     catch (Exception ex)
     {
-        logger.LogWarning("[DBDebug] Auto-detection failed: {Message}. Falling back to MySQL 8.0.", ex.Message);
+        startupLogger.LogWarning("[DBDebug] Auto-detection failed: {Message}. Falling back to MySQL 8.0.", ex.Message);
         options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)));
     }
 });
