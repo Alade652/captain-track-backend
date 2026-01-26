@@ -168,29 +168,34 @@ if (builder.Environment.IsProduction())
         .PersistKeysToFileSystem(new System.IO.DirectoryInfo(dataProtectionKeysPath));
 }
 
-string connectionString = builder.Configuration.GetConnectionString("CaptainTrackConnectionString");
+// Use a temporary logger for early diagnostics
+using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+var logger = loggerFactory.CreateLogger("Program");
 
-// Diagnostics: Print masked connection string to debug the "database ''" error
+string connectionString = builder.Configuration.GetConnectionString("CaptainTrackConnectionString") 
+    ?? builder.Configuration["ConnectionStrings:CaptainTrackConnectionString"]
+    ?? Environment.GetEnvironmentVariable("ConnectionStrings__CaptainTrackConnectionString");
+
 if (!string.IsNullOrEmpty(connectionString))
 {
     var parts = connectionString.Split(';');
     var maskedParts = parts.Select(p => 
     {
-        if (p.Trim().StartsWith("password=", StringComparison.OrdinalIgnoreCase)) return "password=******";
+        var trimmed = p.Trim();
+        if (trimmed.StartsWith("password=", StringComparison.OrdinalIgnoreCase)) return "password=******";
         return p;
     });
-    Console.WriteLine($"[DBDebug] ConnectionString (Masked): {string.Join(";", maskedParts)}");
+    logger.LogInformation("[DBDebug] ConnectionString found (Masked): {ConnectionString}", string.Join(";", maskedParts));
 }
 else
 {
-    Console.WriteLine("[DBDebug] ERROR: CaptainTrackConnectionString is NULL or EMPTY.");
+    logger.LogError("[DBDebug] ERROR: CaptainTrackConnectionString is NULL or EMPTY. Checked GetConnectionString, Configuration direct, and Environment Variables.");
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options => 
 {
     if (string.IsNullOrEmpty(connectionString))
     {
-        // Fallback to avoid crash during startup if missing, though it will fail later
         options.UseMySql("server=localhost", new MySqlServerVersion(new Version(8, 0, 0)));
         return;
     }
@@ -201,8 +206,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[DBDebug] Auto-detection failed: {ex.Message}");
-        // Fallback to a common high version if auto-detect fails (e.g. during build/migration)
+        logger.LogWarning("[DBDebug] Auto-detection failed: {Message}. Falling back to MySQL 8.0.", ex.Message);
         options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)));
     }
 });
@@ -230,8 +234,19 @@ try
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
         
         logger.LogInformation("═══════════════════════════════════════════════════════");
-        logger.LogInformation("🔍 Testing database connection...");
+        logger.LogInformation("🔍 Testing database connection and applying migrations...");
         
+        // Apply pending migrations automatically
+        try 
+        {
+            dbContext.Database.Migrate();
+            logger.LogInformation("✅ Database migrations applied successfully!");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("⚠️ Could not apply migrations: {Message}. The database may already be up to date or lacks permissions.", ex.Message);
+        }
+
         var canConnect = dbContext.Database.CanConnect();
         
         if (canConnect)
