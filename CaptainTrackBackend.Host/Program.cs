@@ -313,8 +313,10 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-// Only enable Swagger in Development
-if (app.Environment.IsDevelopment())
+// Swagger: enabled in Development; in Production enable via ENABLE_SWAGGER=true if desired
+var enableSwagger = app.Environment.IsDevelopment()
+    || string.Equals(Environment.GetEnvironmentVariable("ENABLE_SWAGGER"), "true", StringComparison.OrdinalIgnoreCase);
+if (enableSwagger)
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
