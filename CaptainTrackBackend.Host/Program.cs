@@ -313,17 +313,12 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-// Swagger: enabled in Development; in Production enable via ENABLE_SWAGGER=true if desired
-var enableSwagger = app.Environment.IsDevelopment()
-    || string.Equals(Environment.GetEnvironmentVariable("ENABLE_SWAGGER"), "true", StringComparison.OrdinalIgnoreCase);
-if (enableSwagger)
+// Swagger: always enabled (docs at /swagger)
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "CaptainTrackApi");
-    });
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "CaptainTrackApi");
+});
 
 
 app.UseEndpoints(endpoints =>
