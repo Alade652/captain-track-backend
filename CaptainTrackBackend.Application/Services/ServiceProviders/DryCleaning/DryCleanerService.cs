@@ -1,4 +1,4 @@
-﻿using CaptainTrackBackend.Application.Abstraction.Interface.Repository;
+using CaptainTrackBackend.Application.Abstraction.Interface.Repository;
 using CaptainTrackBackend.Application.Abstraction.Interface.Services;
 using CaptainTrackBackend.Application.Abstraction.Interface.Services.ServiceProviders.DryCleaning;
 using CaptainTrackBackend.Application.DTO;
@@ -115,24 +115,51 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                 }
             }
 
-            var dryCleaner = new DryCleaner
+            // Check if dry cleaner already exists for this user
+            var existingDryCleaner = await _unitofWork.DryCleaner.GetAsync(x => x.UserId == userId);
+            DryCleaner dryCleaner;
+            
+            if (existingDryCleaner != null)
             {
-                UserId = userId,
-                CompanyName = request.CompanyName,
-                RCorNIN = request.RC,
-                BusinessLogoorImageUrl = request.BusinessLogoUrl,
-                BusinessContact = request.CompanyContact,
-                AddressorLocation = request.Address,
-                Owner = request.Owner,
-                Locations = request.Locations,
-                City = request.City,
-                YearsOfService = request.YearsOfService,
-                AccountName = request.AccountName,
-                AccountNumber = request.AccountNumber,
-                BankName = request.BankName,
-                ServiceProviderRole = ServiceProviderRole.StoreOwner
-            };
-            await _unitofWork.DryCleaner.AddAsync(dryCleaner);
+                // Update existing record
+                dryCleaner = existingDryCleaner;
+                dryCleaner.CompanyName = request.CompanyName;
+                dryCleaner.RCorNIN = request.RC;
+                dryCleaner.BusinessLogoorImageUrl = request.BusinessLogoUrl;
+                dryCleaner.BusinessContact = request.CompanyContact;
+                dryCleaner.AddressorLocation = request.Address;
+                dryCleaner.Owner = request.Owner;
+                dryCleaner.Locations = request.Locations;
+                dryCleaner.City = request.City;
+                dryCleaner.YearsOfService = request.YearsOfService;
+                dryCleaner.AccountName = request.AccountName;
+                dryCleaner.AccountNumber = request.AccountNumber;
+                dryCleaner.BankName = request.BankName;
+                dryCleaner.ServiceProviderRole = ServiceProviderRole.StoreOwner;
+                await _unitofWork.DryCleaner.UpdateAsync(dryCleaner);
+            }
+            else
+            {
+                // Create new record
+                dryCleaner = new DryCleaner
+                {
+                    UserId = userId,
+                    CompanyName = request.CompanyName,
+                    RCorNIN = request.RC,
+                    BusinessLogoorImageUrl = request.BusinessLogoUrl,
+                    BusinessContact = request.CompanyContact,
+                    AddressorLocation = request.Address,
+                    Owner = request.Owner,
+                    Locations = request.Locations,
+                    City = request.City,
+                    YearsOfService = request.YearsOfService,
+                    AccountName = request.AccountName,
+                    AccountNumber = request.AccountNumber,
+                    BankName = request.BankName,
+                    ServiceProviderRole = ServiceProviderRole.StoreOwner
+                };
+                await _unitofWork.DryCleaner.AddAsync(dryCleaner);
+            }
 
             var service = await _unitofWork.Context.ServiceProvidings
                 .FirstOrDefaultAsync(x => x.Name == "Dry Cleaning");
@@ -151,12 +178,20 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             user.ServiceProviderRole = dryCleaner.ServiceProviderRole;
             await _unitofWork.User.UpdateAsync(user);
 
-            var userServiceproviding = new UserServiceProviding
+            // Check if UserServiceProviding already exists
+            var existingUserServiceProviding = await _unitofWork.Context.UserServiceProvidings
+                .FirstOrDefaultAsync(x => x.UserId == user.Id && x.ServiceProvidingId == service.Id);
+            
+            if (existingUserServiceProviding == null)
             {
-                UserId = user.Id,
-                ServiceProvidingId = service.Id,
-            };
-            await _unitofWork.Context.UserServiceProvidings.AddAsync(userServiceproviding);
+                var userServiceproviding = new UserServiceProviding
+                {
+                    UserId = user.Id,
+                    ServiceProvidingId = service.Id,
+                };
+                await _unitofWork.Context.UserServiceProvidings.AddAsync(userServiceproviding);
+            }
+            
             await _unitofWork.Context.SaveChangesAsync();
             var emailDto = new EmailDto
             {
@@ -246,20 +281,44 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             {
                 request.ImageUrl = await _unitofWork.FileUpload.UploadAsync(file);
             }
-            var dryCleaner = new DryCleaner
+            
+            // Check if dry cleaner already exists for this user
+            var existingDryCleaner = await _unitofWork.DryCleaner.GetAsync(x => x.UserId == userId);
+            DryCleaner dryCleaner;
+            
+            if (existingDryCleaner != null)
             {
-                UserId = userId,
-                BusinessContact = request.BusinessContact,
-                RCorNIN = request.NIN,
-                AddressorLocation = request.Location,
-                City = request.City,
-                BankName = request.BankName,
-                AccountName = request.AccountName,
-                AccountNumber = request.AccountNumber,
-                BusinessLogoorImageUrl = request.ImageUrl,
-                ServiceProviderRole = ServiceProviderRole.Freelancer
-            };
-            await _unitofWork.DryCleaner.AddAsync(dryCleaner);
+                // Update existing record
+                dryCleaner = existingDryCleaner;
+                dryCleaner.BusinessContact = request.BusinessContact;
+                dryCleaner.RCorNIN = request.NIN;
+                dryCleaner.AddressorLocation = request.Location;
+                dryCleaner.City = request.City;
+                dryCleaner.BankName = request.BankName;
+                dryCleaner.AccountName = request.AccountName;
+                dryCleaner.AccountNumber = request.AccountNumber;
+                dryCleaner.BusinessLogoorImageUrl = request.ImageUrl;
+                dryCleaner.ServiceProviderRole = ServiceProviderRole.Freelancer;
+                await _unitofWork.DryCleaner.UpdateAsync(dryCleaner);
+            }
+            else
+            {
+                // Create new record
+                dryCleaner = new DryCleaner
+                {
+                    UserId = userId,
+                    BusinessContact = request.BusinessContact,
+                    RCorNIN = request.NIN,
+                    AddressorLocation = request.Location,
+                    City = request.City,
+                    BankName = request.BankName,
+                    AccountName = request.AccountName,
+                    AccountNumber = request.AccountNumber,
+                    BusinessLogoorImageUrl = request.ImageUrl,
+                    ServiceProviderRole = ServiceProviderRole.Freelancer
+                };
+                await _unitofWork.DryCleaner.AddAsync(dryCleaner);
+            }
 
             var service = await _unitofWork.Context.ServiceProvidings
                 .FirstOrDefaultAsync(x => x.Name == "Dry Cleaning");
@@ -278,12 +337,20 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             user.ServiceProviderRole = dryCleaner.ServiceProviderRole;
             await _unitofWork.User.UpdateAsync(user);
 
-            var userServiceproviding = new UserServiceProviding
+            // Check if UserServiceProviding already exists
+            var existingUserServiceProviding = await _unitofWork.Context.UserServiceProvidings
+                .FirstOrDefaultAsync(x => x.UserId == user.Id && x.ServiceProvidingId == service.Id);
+            
+            if (existingUserServiceProviding == null)
             {
-                UserId = user.Id,
-                ServiceProvidingId = service.Id,
-            };
-            await _unitofWork.Context.UserServiceProvidings.AddAsync(userServiceproviding);
+                var userServiceproviding = new UserServiceProviding
+                {
+                    UserId = user.Id,
+                    ServiceProvidingId = service.Id,
+                };
+                await _unitofWork.Context.UserServiceProvidings.AddAsync(userServiceproviding);
+            }
+            
             await _unitofWork.Context.SaveChangesAsync();
             var emailDto = new EmailDto
             {
