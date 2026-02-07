@@ -1,4 +1,4 @@
-﻿using CaptainTrackBackend.Application.Abstraction.Interface.Maps;
+using CaptainTrackBackend.Application.Abstraction.Interface.Maps;
 using CaptainTrackBackend.Application.Abstraction.Interface.Repository;
 using CaptainTrackBackend.Application.Abstraction.Interface.Services.ServiceProviders.DryCleaning;
 using CaptainTrackBackend.Application.Context;
@@ -105,7 +105,13 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
         public async Task<Response<DryCleaningDto>> Book(Guid dryCleaningId)
         {    
             var response = new Response<DryCleaningDto>();
-            var dryCleaning = await _unitOfWork.DryCleaning.GetAsync(x => x.Id == dryCleaningId);
+            var dryCleaning = await _unitOfWork.DryCleaning.GetByIdWithDetailsAsync(dryCleaningId);
+            if (dryCleaning == null)
+            {
+                response.Success = false;
+                response.Message = "Dry cleaning booking not found.";
+                return response;
+            }
             if(dryCleaning.DryCleanerId != null)
             {
                 dryCleaning.Status = ServiceStatus.Booked;
@@ -125,6 +131,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                     DryCleaningItems = dryCleaning.DryCleaningItems.Select(x => new DryCleaningItemDto
                     {
                         ItemId = x.DryCleanerLaundryItemId,
+                        ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
                         Quantity = x.Quantity,
                         TotalPrice = x.TotalPrice
                     }).ToList()
@@ -145,6 +152,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                     DryCleaningItems = dryCleaning.DryCleaningItems.Select(x => new DryCleaningItemDto
                     {
                         ItemId = x.LaundryItemId,
+                        ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
                         Quantity = x.Quantity,
                         TotalPrice = x.TotalPrice
                     }).ToList()
@@ -200,7 +208,8 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                         DryCleaningItems = x.DryCleaningItems.Select(item => new DryCleaningItemDto
                         {
                             Id = item.Id,
-                            ItemId = item.LaundryItemId,
+                            ItemId = item.LaundryItemId ?? item.DryCleanerLaundryItemId,
+                            ItemName = item.LaundryItem?.Name ?? item.DryCleanerLaundryItem?.LaundryItem?.Name,
                             Quantity = item.Quantity,
                             TotalPrice = item.TotalPrice
                         }).ToList()
@@ -270,6 +279,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                     {
                         Id = x.Id,
                         ItemId = x.DryCleanerLaundryItemId,
+                        ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
                         Quantity = x.Quantity,
                         TotalPrice = x.TotalPrice
                     }).ToList()
@@ -330,6 +340,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                     {
                         Id = x.Id,
                         ItemId = x.LaundryItemId,
+                        ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
                         Quantity = x.Quantity,
                         TotalPrice = x.TotalPrice
                     }).ToList()
@@ -370,7 +381,8 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                 DryCleaningItems = x.DryCleaningItems.Select(item => new DryCleaningItemDto
                 {
                     Id = item.Id,
-                    ItemId = item.LaundryItemId,
+                    ItemId = item.LaundryItemId ?? item.DryCleanerLaundryItemId,
+                    ItemName = item.LaundryItem?.Name ?? item.DryCleanerLaundryItem?.LaundryItem?.Name,
                     Quantity = item.Quantity,
                     TotalPrice = item.TotalPrice
                 }).ToList()
@@ -437,7 +449,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
         public async Task<Response<DryCleaningDto>> AcceptOffer(Guid bookingId, Guid dryCleanerUserId, decimal offerAmount)
         {
             var response = new Response<DryCleaningDto>();
-            var booking = await _unitOfWork.DryCleaning.GetAsync(x => x.Id == bookingId );
+            var booking = await _unitOfWork.DryCleaning.GetByIdWithDetailsAsync(bookingId);
             if (booking == null)
             {
                 response.Success = false;
@@ -489,7 +501,8 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                 DryCleaningItems = booking.DryCleaningItems.Select(x => new DryCleaningItemDto
                 {
                     Id = x.Id,
-                    ItemId = x.LaundryItemId,
+                    ItemId = x.LaundryItemId ?? x.DryCleanerLaundryItemId,
+                    ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
                     Quantity = x.Quantity,
                     TotalPrice = x.TotalPrice
                 }).ToList()
@@ -500,7 +513,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
         public async Task<Response<DryCleaningDto>> RaisePrice(Guid bookingId, decimal newPrice)
         {
             var response = new Response<DryCleaningDto>();
-            var booking = await _unitOfWork.DryCleaning.GetAsync(x => x.Id == bookingId);
+            var booking = await _unitOfWork.DryCleaning.GetByIdWithDetailsAsync(bookingId);
             if (booking == null)
             {
                 response.Success = false;
@@ -530,7 +543,8 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                 DryCleaningItems = booking.DryCleaningItems.Select(x => new DryCleaningItemDto
                 {
                     Id = x.Id,
-                    ItemId = x.LaundryItemId,
+                    ItemId = x.LaundryItemId ?? x.DryCleanerLaundryItemId,
+                    ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
                     Quantity = x.Quantity,
                     TotalPrice = x.TotalPrice
                 }).ToList()

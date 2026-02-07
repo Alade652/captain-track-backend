@@ -1,4 +1,4 @@
-﻿using CaptainTrackBackend.Domain.Entities.ServiceProviders;
+using CaptainTrackBackend.Domain.Entities.ServiceProviders;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +11,8 @@ namespace CaptainTrackBackend.Application.DTO.ServiceProviders.DryCleaning
     {
         public Guid Id { get; set; }
         public Guid? ItemId { get; set; }
+        /// <summary>Laundry item name from LaundryItem (via DryCleanerLaundryItem or direct).</summary>
+        public string? ItemName { get; set; }
         public decimal TotalPrice { get; set; }
         public int Quantity { get; set; }
     }

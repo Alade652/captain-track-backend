@@ -1,4 +1,4 @@
-﻿using CaptainTrackBackend.Domain.Entities.ServiceProviders.DryCleaning;
+using CaptainTrackBackend.Domain.Entities.ServiceProviders.DryCleaning;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,5 +11,6 @@ namespace CaptainTrackBackend.Application.Abstraction.Interface.Repository.Servi
     public interface IDryCleaningRepository : IRepositoryAsync<DryClean>
     {
         Task<IEnumerable<DryClean>> GetAllByExpressionAsync(Expression<Func<DryClean, bool>> expression);
+        Task<DryClean?> GetByIdWithDetailsAsync(Guid id);
     }
 }

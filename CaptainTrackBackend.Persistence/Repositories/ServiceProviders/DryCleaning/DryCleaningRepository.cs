@@ -1,4 +1,4 @@
-﻿using CaptainTrackBackend.Application.Abstraction.Interface.Repository.ServiceProviders.DryCleaning;
+using CaptainTrackBackend.Application.Abstraction.Interface.Repository.ServiceProviders.DryCleaning;
 using CaptainTrackBackend.Application.Context;
 using CaptainTrackBackend.Domain.Entities.ServiceProviders.DryCleaning;
 using Microsoft.EntityFrameworkCore;
@@ -21,12 +21,24 @@ namespace CaptainTrackBackend.Persistence.Repositories.ServiceProviders.DryClean
 
         public async Task<IEnumerable<DryClean>> GetAllByExpressionAsync(Expression<Func<DryClean, bool>> expression)
         {
-            var dryCleanings = await _context.DryCleanings.Include(x => x.DryCleaningItems).ThenInclude(dryCleanings => dryCleanings.LaundryItem)
+            var dryCleanings = await _context.DryCleanings
+                .Include(x => x.DryCleaningItems).ThenInclude(di => di.LaundryItem)
+                .Include(x => x.DryCleaningItems).ThenInclude(di => di.DryCleanerLaundryItem).ThenInclude(dcl => dcl.LaundryItem)
                 .Include(x => x.DryCleaner)
                 .Include(x => x.Customer)
                 .Where(expression)
                 .ToListAsync();
             return dryCleanings;
+        }
+
+        public async Task<DryClean?> GetByIdWithDetailsAsync(Guid id)
+        {
+            return await _context.DryCleanings
+                .Include(x => x.DryCleaningItems).ThenInclude(di => di.LaundryItem)
+                .Include(x => x.DryCleaningItems).ThenInclude(di => di.DryCleanerLaundryItem).ThenInclude(dcl => dcl.LaundryItem)
+                .Include(x => x.DryCleaner)
+                .Include(x => x.Customer)
+                .FirstOrDefaultAsync(x => x.Id == id);
         }
     }
 }
