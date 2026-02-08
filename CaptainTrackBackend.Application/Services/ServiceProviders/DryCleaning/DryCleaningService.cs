@@ -439,7 +439,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                 response.Message = "Dry cleaning booking not found.";
                 return response;
             }
-
+            dryCleaning.Status = ServiceStatus.Cancelled;
             await _unitOfWork.DryCleaning.UpdateAsync(dryCleaning);
             response.Success = true;
             response.Message = "Dry cleaning booking cancelled successfully.";
