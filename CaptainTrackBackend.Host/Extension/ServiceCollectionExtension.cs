@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using CaptainTrackBackend.Application.Abstraction.Interface.Maps;
 using CaptainTrackBackend.Application.Abstraction.Interface.Repository;
 using CaptainTrackBackend.Application.Abstraction.Interface.Repository.ServiceProviders;
@@ -145,6 +145,11 @@ namespace CaptainTrackBackend.Host.Extension
             })
             .AddJwtBearer(options =>
             {
+                // Use the classic JwtSecurityTokenHandler instead of the newer JsonWebTokenHandler.
+                // The JsonWebTokenHandler (default in .NET 8) has known token parsing issues
+                // that cause "no dots" errors even with valid JWT tokens.
+                options.UseSecurityTokenValidators = true;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -154,6 +159,51 @@ namespace CaptainTrackBackend.Host.Extension
                     ValidIssuer = jwtSettings["Issuer"],
                     ValidAudience = jwtSettings["Audience"],
                     IssuerSigningKey = new SymmetricSecurityKey(key)
+                };
+
+                // SignalR sends JWT via query string (WebSockets can't use Authorization header)
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var path = context.HttpContext.Request.Path;
+
+                        // Check if this is a SignalR hub endpoint
+                        bool isHubPath = path.StartsWithSegments("/negotiationHub") ||
+                                         path.StartsWithSegments("/bookingHub") ||
+                                         path.StartsWithSegments("/locationHub") ||
+                                         path.StartsWithSegments("/notificationHub");
+
+                        if (!isHubPath)
+                            return Task.CompletedTask;
+
+                        // For hub endpoints, extract token from query string (WebSocket)
+                        // or Authorization header (negotiate HTTP request)
+                        string? token = context.Request.Query["access_token"].FirstOrDefault();
+
+                        if (string.IsNullOrEmpty(token))
+                        {
+                            // Negotiate endpoint sends token via Authorization header
+                            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                            if (!string.IsNullOrEmpty(authHeader) &&
+                                authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                            {
+                                token = authHeader.Substring("Bearer ".Length);
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            // Clean the token: trim whitespace and invisible characters
+                            token = token.Trim();
+
+
+                            context.Token = token;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+
                 };
             });
             return services;

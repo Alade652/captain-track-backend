@@ -124,30 +124,26 @@ builder.Services.AddCors(options =>
     {
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
         
-        if (allowedOrigins != null && allowedOrigins.Length > 0)
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        }
-        else
-        {
-            // Fallback for development - restrict in production!
-            if (builder.Environment.IsDevelopment())
-            {
-                policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "http://localhost:4200")
-                      .AllowAnyMethod()
-                      .AllowAnyHeader()
-                      .AllowCredentials();
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    "CORS allowed origins are not configured. " +
-                    "Please set Cors:AllowedOrigins in appsettings.json or environment variables.");
-            }
-        }
+                if (builder.Environment.IsDevelopment())
+                {
+                    policy.SetIsOriginAllowed(origin => true) // Allow any origin in Development
+                          .AllowAnyMethod()
+                          .AllowAnyHeader()
+                          .AllowCredentials();
+                }
+                else if (allowedOrigins != null && allowedOrigins.Length > 0)
+                {
+                    policy.WithOrigins(allowedOrigins)
+                          .AllowAnyMethod()
+                          .AllowAnyHeader()
+                          .AllowCredentials();
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        "CORS allowed origins are not configured. " +
+                        "Please set Cors:AllowedOrigins in appsettings.json or environment variables.");
+                }
         
                //.AllowCredentials(); // If you�re using cookies or authorization
     });
@@ -289,10 +285,7 @@ catch (Exception ex)
     logger.LogError("═══════════════════════════════════════════════════════");
 }
 
-app.MapHub<LocationHub>("/locationHub");
-app.MapHub<NegotiationHub>("/negotiationHub");
-app.MapHub<NotificationHub>("/notificationHub");
-app.MapHub<BookingHub>("/bookingHub");
+
 
 
 
@@ -323,6 +316,10 @@ app.UseSwaggerUI(options =>
 
 app.UseEndpoints(endpoints =>
 {
+    endpoints.MapHub<LocationHub>("/locationHub");
+    endpoints.MapHub<NegotiationHub>("/negotiationHub");
+    endpoints.MapHub<NotificationHub>("/notificationHub");
+    endpoints.MapHub<BookingHub>("/bookingHub");
     endpoints.MapControllers();
 });
 

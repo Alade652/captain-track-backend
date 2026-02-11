@@ -440,6 +440,13 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
                 .SendAsync("BookingStatusUpdated", bookingDto);
 
+            // Notify the dry cleaner that they successfully accepted the booking
+            if (dryCleaning.DryCleaner != null)
+            {
+                await _hubContext.Clients.User(dryCleaning.DryCleaner.UserId.ToString())
+                    .SendAsync("BookingStatusUpdated", bookingDto);
+            }
+
             response.Success = true;
             response.Message = "Dry cleaning booking accepted successfully.";
             return response;
@@ -479,6 +486,13 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             };
             await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
                 .SendAsync("BookingStatusUpdated", bookingDto);
+
+            // Notify the dry cleaner that their rejection was processed
+            if (dryCleaning.DryCleaner != null)
+            {
+                await _hubContext.Clients.User(dryCleaning.DryCleaner.UserId.ToString())
+                    .SendAsync("BookingStatusUpdated", bookingDto);
+            }
 
             response.Success = true;
             response.Message = "Dry cleaning booking rejected successfully.";
@@ -606,6 +620,10 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             await _hubContext.Clients.User(booking.CustomerId.ToString())
                 .SendAsync("BookingStatusUpdated", response.Data);
 
+            // Notify the dry cleaner that their offer was accepted
+            await _hubContext.Clients.User(dryCleanerUserId.ToString())
+                .SendAsync("BookingStatusUpdated", response.Data);
+
             return response;
         }
 
@@ -648,9 +666,9 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                     TotalPrice = x.TotalPrice
                 }).ToList()
             };
+            response.Data = data;
             var notify = await NotifyServiceProviders(response.Data);
             data.ProvidersNotified = notify.ProvidersNotified;
-            response.Data = data;
             return response;
         }
     }
