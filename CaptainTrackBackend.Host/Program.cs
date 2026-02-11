@@ -123,29 +123,28 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowSpecificOrigin", policy =>
     {
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
-        
-                if (builder.Environment.IsDevelopment())
-                {
-                    policy.SetIsOriginAllowed(origin => true) // Allow any origin in Development
-                          .AllowAnyMethod()
-                          .AllowAnyHeader()
-                          .AllowCredentials();
-                }
-                else if (allowedOrigins != null && allowedOrigins.Length > 0)
-                {
-                    policy.WithOrigins(allowedOrigins)
-                          .AllowAnyMethod()
-                          .AllowAnyHeader()
-                          .AllowCredentials();
-                }
-                else
-                {
-                    throw new InvalidOperationException(
-                        "CORS allowed origins are not configured. " +
-                        "Please set Cors:AllowedOrigins in appsettings.json or environment variables.");
-                }
-        
-               //.AllowCredentials(); // If you�re using cookies or authorization
+
+        // Filter out placeholder values
+        var validOrigins = allowedOrigins?
+            .Where(o => !string.IsNullOrWhiteSpace(o) && !o.Contains("yourdomain.com"))
+            .ToArray();
+
+        if (validOrigins != null && validOrigins.Length > 0)
+        {
+            policy.WithOrigins(validOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+        else
+        {
+            // No specific origins configured — allow any origin.
+            // Required for SignalR which needs AllowCredentials (incompatible with AllowAnyOrigin).
+            policy.SetIsOriginAllowed(origin => true)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
     });
 });
 
