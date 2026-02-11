@@ -67,10 +67,10 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                             booking.DurationToPickupLocation = element.duration.text;
 
 
-                            await _hubContext.Clients.User(provider.Id.ToString())
+                            await _hubContext.Clients.User(provider.UserId.ToString())
                                 .SendAsync("ReceivePendingBooking", booking);
                             response.ProvidersNotified++;
-                            _logger.LogInformation($"Notified provider {provider.Id} f");
+                            _logger.LogInformation($"Notified provider {provider.UserId}");
                         }
                     }
                     catch (Exception ex)
@@ -262,28 +262,35 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             var package = await _unitOfWork.LaundryPackage.GetAsync(x => x.Id == dryCleaningrequest.PackageId);
             dryClean.EstimateTotalAMount += package.ExtraCharge;
             await _unitOfWork.DryCleaning.AddAsync(dryClean);
+
+            var bookingDto = new DryCleaningDto
+            {
+                DrycleaningId = dryClean.Id,
+                CustomerId = dryClean.CustomerId,
+                DryCleanerId = dryClean.DryCleanerId,
+                PackageId = dryClean.PackageId,
+                DeliveryDate = dryClean.DeliveryDate,
+                Status = dryClean.Status.ToString(),
+                TotalAmount = dryClean.TotalAmount,
+                DryCleaningItems = dryClean.DryCleaningItems.Select(x => new DryCleaningItemDto
+                {
+                    Id = x.Id,
+                    ItemId = x.DryCleanerLaundryItemId,
+                    ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
+                    Quantity = x.Quantity,
+                    TotalPrice = x.TotalPrice
+                }).ToList()
+            };
+
+            // Notify the chosen provider in real-time
+            await _hubContext.Clients.User(dryCleanerUserid.ToString())
+                .SendAsync("ReceivePendingBooking", bookingDto);
+
             return new Response<DryCleaningDto>
             {
                 Message = "Dry cleaning booking initialized successfully",
                 Success = true,
-                Data = new DryCleaningDto
-                {
-                    DrycleaningId = dryClean.Id,
-                    CustomerId = dryClean.CustomerId,
-                    DryCleanerId = dryClean.DryCleanerId,
-                    PackageId = dryClean.PackageId,
-                    DeliveryDate = dryClean.DeliveryDate,
-                    Status = dryClean.Status.ToString(),
-                    TotalAmount = dryClean.TotalAmount,
-                    DryCleaningItems = dryClean.DryCleaningItems.Select(x => new DryCleaningItemDto
-                    {
-                        Id = x.Id,
-                        ItemId = x.DryCleanerLaundryItemId,
-                        ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
-                        Quantity = x.Quantity,
-                        TotalPrice = x.TotalPrice
-                    }).ToList()
-                }
+                Data = bookingDto
             };
         }
 
@@ -398,7 +405,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
         public async Task<Response<bool>> AccepBooking(Guid dryCleaningId)
         {
             var response = new Response<bool>();
-            var dryCleaning = await _unitOfWork.DryCleaning.GetAsync(x => x.Id == dryCleaningId);
+            var dryCleaning = await _unitOfWork.DryCleaning.GetByIdWithDetailsAsync(dryCleaningId);
             if (dryCleaning == null)
             {
                 response.Success = false;
@@ -407,6 +414,32 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             }
             dryCleaning.Status = ServiceStatus.InProgress;
             await _unitOfWork.DryCleaning.UpdateAsync(dryCleaning);
+
+            // Notify the customer in real-time that the provider accepted
+            var bookingDto = new DryCleaningDto
+            {
+                DrycleaningId = dryCleaning.Id,
+                CustomerId = dryCleaning.CustomerId,
+                DryCleanerId = dryCleaning.DryCleanerId,
+                PackageId = dryCleaning.PackageId,
+                DeliveryDate = dryCleaning.DeliveryDate,
+                Status = dryCleaning.Status.ToString(),
+                TotalAmount = dryCleaning.TotalAmount,
+                EstimateTotalAmount = dryCleaning.EstimateTotalAMount,
+                DistanceToPickupLocation = dryCleaning.DistancetoLocation,
+                DurationToPickupLocation = dryCleaning.DuraiontoLocation,
+                DryCleaningItems = dryCleaning.DryCleaningItems.Select(x => new DryCleaningItemDto
+                {
+                    Id = x.Id,
+                    ItemId = x.LaundryItemId ?? x.DryCleanerLaundryItemId,
+                    ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
+                    Quantity = x.Quantity,
+                    TotalPrice = x.TotalPrice
+                }).ToList()
+            };
+            await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", bookingDto);
+
             response.Success = true;
             response.Message = "Dry cleaning booking accepted successfully.";
             return response;
@@ -415,7 +448,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
         public async Task<Response<bool>> RejectBooking(Guid dryCleaningId)
         {
             var response = new Response<bool>();
-            var dryCleaning = await _unitOfWork.DryCleaning.GetAsync(x => x.Id == dryCleaningId);
+            var dryCleaning = await _unitOfWork.DryCleaning.GetByIdWithDetailsAsync(dryCleaningId);
             if (dryCleaning == null)
             {
                 response.Success = false;
@@ -424,6 +457,29 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             }
             dryCleaning.Status = ServiceStatus.Rejected;
             await _unitOfWork.DryCleaning.UpdateAsync(dryCleaning);
+
+            // Notify the customer in real-time that the provider rejected
+            var bookingDto = new DryCleaningDto
+            {
+                DrycleaningId = dryCleaning.Id,
+                CustomerId = dryCleaning.CustomerId,
+                DryCleanerId = dryCleaning.DryCleanerId,
+                PackageId = dryCleaning.PackageId,
+                DeliveryDate = dryCleaning.DeliveryDate,
+                Status = dryCleaning.Status.ToString(),
+                EstimateTotalAmount = dryCleaning.EstimateTotalAMount,
+                DryCleaningItems = dryCleaning.DryCleaningItems.Select(x => new DryCleaningItemDto
+                {
+                    Id = x.Id,
+                    ItemId = x.LaundryItemId ?? x.DryCleanerLaundryItemId,
+                    ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
+                    Quantity = x.Quantity,
+                    TotalPrice = x.TotalPrice
+                }).ToList()
+            };
+            await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", bookingDto);
+
             response.Success = true;
             response.Message = "Dry cleaning booking rejected successfully.";
             return response;
@@ -432,7 +488,7 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
         public async Task<Response<bool>> CancelBooking(Guid dryCleaningId)
         {
             var response = new Response<bool>();
-            var dryCleaning = await _unitOfWork.DryCleaning.GetAsync(x => x.Id == dryCleaningId);
+            var dryCleaning = await _unitOfWork.DryCleaning.GetByIdWithDetailsAsync(dryCleaningId);
             if (dryCleaning == null)
             {
                 response.Success = false;
@@ -441,6 +497,38 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             }
             dryCleaning.Status = ServiceStatus.Cancelled;
             await _unitOfWork.DryCleaning.UpdateAsync(dryCleaning);
+
+            // Notify both the customer and the provider in real-time
+            var bookingDto = new DryCleaningDto
+            {
+                DrycleaningId = dryCleaning.Id,
+                CustomerId = dryCleaning.CustomerId,
+                DryCleanerId = dryCleaning.DryCleanerId,
+                PackageId = dryCleaning.PackageId,
+                DeliveryDate = dryCleaning.DeliveryDate,
+                Status = dryCleaning.Status.ToString(),
+                EstimateTotalAmount = dryCleaning.EstimateTotalAMount,
+                DryCleaningItems = dryCleaning.DryCleaningItems.Select(x => new DryCleaningItemDto
+                {
+                    Id = x.Id,
+                    ItemId = x.LaundryItemId ?? x.DryCleanerLaundryItemId,
+                    ItemName = x.LaundryItem?.Name ?? x.DryCleanerLaundryItem?.LaundryItem?.Name,
+                    Quantity = x.Quantity,
+                    TotalPrice = x.TotalPrice
+                }).ToList()
+            };
+
+            // Notify the customer
+            await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", bookingDto);
+
+            // Notify the provider (if one was assigned)
+            if (dryCleaning.DryCleanerId != null && dryCleaning.DryCleaner != null)
+            {
+                await _hubContext.Clients.User(dryCleaning.DryCleaner.UserId.ToString())
+                    .SendAsync("BookingStatusUpdated", bookingDto);
+            }
+
             response.Success = true;
             response.Message = "Dry cleaning booking cancelled successfully.";
             return response;
@@ -470,12 +558,18 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
 
 
             var res = await _mapServices.GetDistanceAsync(dryCleaner.AddressorLocation, booking.CustomerLocation);
-            var elem = res.rows.FirstOrDefault()?.elements.FirstOrDefault();
-            var distanceToPickupLocation = elem?.distance.text;
-            var durationToPickupLocation = elem?.duration.text;
-            if (distanceToPickupLocation == null || durationToPickupLocation == null)
+            if (res?.rows == null || !res.rows.Any())
             {
-                response.Message = "Failed to calculate distance or duration.";
+                response.Message = "Failed to get distance from maps (no result). Check provider and customer addresses.";
+                response.Success = false;
+                return response;
+            }
+            var elem = res.rows.FirstOrDefault()?.elements?.FirstOrDefault();
+            var distanceToPickupLocation = elem?.distance?.text;
+            var durationToPickupLocation = elem?.duration?.text;
+            if (string.IsNullOrEmpty(distanceToPickupLocation) || string.IsNullOrEmpty(durationToPickupLocation))
+            {
+                response.Message = "Failed to calculate distance or duration. The maps service may have returned an error for the given addresses.";
                 response.Success = false;
                 return response;
             }
@@ -507,6 +601,11 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                     TotalPrice = x.TotalPrice
                 }).ToList()
             };
+
+            // Notify the customer in real-time that the provider accepted the offer
+            await _hubContext.Clients.User(booking.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", response.Data);
+
             return response;
         }
 
