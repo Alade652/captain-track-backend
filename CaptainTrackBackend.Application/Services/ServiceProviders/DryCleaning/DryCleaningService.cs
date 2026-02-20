@@ -69,6 +69,8 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
 
                             await _hubContext.Clients.User(provider.UserId.ToString())
                                 .SendAsync("ReceivePendingBooking", booking);
+                            await _hubContext.Clients.Group(provider.UserId.ToString())
+                                .SendAsync("ReceivePendingBooking", booking);
                             response.ProvidersNotified++;
                             _logger.LogInformation($"Notified provider {provider.UserId}");
                         }
@@ -285,6 +287,8 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             // Notify the chosen provider in real-time
             await _hubContext.Clients.User(dryCleanerUserid.ToString())
                 .SendAsync("ReceivePendingBooking", bookingDto);
+            await _hubContext.Clients.Group(dryCleanerUserid.ToString())
+                .SendAsync("ReceivePendingBooking", bookingDto);
 
             return new Response<DryCleaningDto>
             {
@@ -439,11 +443,15 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             };
             await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
                 .SendAsync("BookingStatusUpdated", bookingDto);
+            await _hubContext.Clients.Group(dryCleaning.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", bookingDto);
 
             // Notify the dry cleaner that they successfully accepted the booking
             if (dryCleaning.DryCleaner != null)
             {
                 await _hubContext.Clients.User(dryCleaning.DryCleaner.UserId.ToString())
+                    .SendAsync("BookingStatusUpdated", bookingDto);
+                await _hubContext.Clients.Group(dryCleaning.DryCleaner.UserId.ToString())
                     .SendAsync("BookingStatusUpdated", bookingDto);
             }
 
@@ -486,11 +494,15 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             };
             await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
                 .SendAsync("BookingStatusUpdated", bookingDto);
+            await _hubContext.Clients.Group(dryCleaning.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", bookingDto);
 
             // Notify the dry cleaner that their rejection was processed
             if (dryCleaning.DryCleaner != null)
             {
                 await _hubContext.Clients.User(dryCleaning.DryCleaner.UserId.ToString())
+                    .SendAsync("BookingStatusUpdated", bookingDto);
+                await _hubContext.Clients.Group(dryCleaning.DryCleaner.UserId.ToString())
                     .SendAsync("BookingStatusUpdated", bookingDto);
             }
 
@@ -532,14 +544,18 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
                 }).ToList()
             };
 
-            // Notify the customer
+            // Notify the customer via both User and Group targeting
             await _hubContext.Clients.User(dryCleaning.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", bookingDto);
+            await _hubContext.Clients.Group(dryCleaning.CustomerId.ToString())
                 .SendAsync("BookingStatusUpdated", bookingDto);
 
             // Notify the provider (if one was assigned)
             if (dryCleaning.DryCleanerId != null && dryCleaning.DryCleaner != null)
             {
                 await _hubContext.Clients.User(dryCleaning.DryCleaner.UserId.ToString())
+                    .SendAsync("BookingStatusUpdated", bookingDto);
+                await _hubContext.Clients.Group(dryCleaning.DryCleaner.UserId.ToString())
                     .SendAsync("BookingStatusUpdated", bookingDto);
             }
 
@@ -619,9 +635,13 @@ namespace CaptainTrackBackend.Application.Services.ServiceProviders.DryCleaning
             // Notify the customer in real-time that the provider accepted the offer
             await _hubContext.Clients.User(booking.CustomerId.ToString())
                 .SendAsync("BookingStatusUpdated", response.Data);
+            await _hubContext.Clients.Group(booking.CustomerId.ToString())
+                .SendAsync("BookingStatusUpdated", response.Data);
 
             // Notify the dry cleaner that their offer was accepted
             await _hubContext.Clients.User(dryCleanerUserId.ToString())
+                .SendAsync("BookingStatusUpdated", response.Data);
+            await _hubContext.Clients.Group(dryCleanerUserId.ToString())
                 .SendAsync("BookingStatusUpdated", response.Data);
 
             return response;
